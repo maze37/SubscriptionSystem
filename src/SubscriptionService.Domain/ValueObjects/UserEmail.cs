@@ -5,18 +5,29 @@ using System.Text.RegularExpressions;
 
 namespace SubscriptionService.Domain.ValueObjects;
 
-/// <summary>Email пользователя.</summary>
+/// <summary>
+/// Value Object - email пользователя.
+/// Инварианты: не может быть пустым, должен соответствовать формату email.
+/// Хранится в нижнем регистре.
+/// </summary>
 public class UserEmail : ValueObject
 {
     private static readonly Regex EmailRegex = new(
         @"^[^@\s]+@[^@\s]+\.[^@\s]+$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+    /// <summary>Максимальная длина email.</summary>
     public const int MaxLenght = 255;
     
     public string Value { get; }
 
     private UserEmail(string value) => Value = value;
+
+    /// <summary>
+    /// Создать email с валидацией формата.
+    /// </summary>
+    /// <param name="value">Строка email.</param>
+    /// <exception cref="DomainException">Если email пустой или некорректного формата.</exception>
 
     public static UserEmail Create(string value)
     {

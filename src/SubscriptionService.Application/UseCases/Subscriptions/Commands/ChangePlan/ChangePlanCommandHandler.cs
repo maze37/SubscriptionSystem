@@ -4,22 +4,30 @@ using SharedKernel.Result;
 
 namespace SubscriptionService.Application.UseCases.Subscriptions.Commands.ChangePlan;
 
+/// <summary>
+/// Обработчик команды ChangePlanCommand.
+/// Проверяет план, меняет PlanId и создаёт новый счёт на оплату.
+/// </summary>
 public class ChangePlanCommandHandler : ICommandHandler<ChangePlanCommand>
 {
     private readonly ISubscriptionRepository _subscriptionRepository;
     private readonly IPlanRepository _planRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IDateTimeProvider _dateTime;
 
     public ChangePlanCommandHandler(
         ISubscriptionRepository subscriptionRepository,
         IPlanRepository planRepository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IDateTimeProvider dateTime)
     {
         _subscriptionRepository = subscriptionRepository ?? throw new ArgumentNullException(nameof(subscriptionRepository));
         _planRepository = planRepository ?? throw new ArgumentNullException(nameof(planRepository));
         _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
+        _dateTime = dateTime ?? throw new ArgumentNullException(nameof(dateTime));
     }
 
+    /// <inheritdoc/>
     public async Task<Result> Handle(
         ChangePlanCommand command,
         CancellationToken cancellationToken)
@@ -45,10 +53,10 @@ public class ChangePlanCommandHandler : ICommandHandler<ChangePlanCommand>
                 Error.Conflict("Нельзя сменить на неактивный план."));
 
         subscription.ChangePlan(
-            command.InvoiceId,
+            Guid.NewGuid(),
             command.NewPlanId,
             plan.Price,
-            command.ChangedWhen);
+            _dateTime.UtcNow);
 
         _subscriptionRepository.Update(subscription);
 

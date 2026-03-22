@@ -25,8 +25,6 @@ public static class DomainErrors
     public static class Plan
     {
         public const string InvalidId = "plan.invalid_id";
-        public const string NotFound = "plan.not_found";
-        public const string NotActive = "plan.not_active";
         public const string AlreadyActive = "plan.already_active";
         public const string AlreadyDeactivated = "plan.already_deactivated";
     }
@@ -34,9 +32,7 @@ public static class DomainErrors
     public static class User
     {
         public const string InvalidId = "user.invalid_id";
-        public const string NotFound = "user.not_found";
         public const string TrialAlreadyUsed = "user.trial_already_used";
-        public const string EmailAlreadyExists = "user.email_already_exists";
     }
 
     public static class Invoice
@@ -52,7 +48,6 @@ public static class DomainErrors
         public const string InvalidId = "subscription.invalid_id";
         public const string InvalidUserId = "subscription.invalid_user_id";
         public const string InvalidPlanId = "subscription.invalid_plan_id";
-        public const string NotFound = "subscription.not_found";
         public const string AlreadyCancelled = "subscription.already_cancelled";
         public const string AlreadyExpired = "subscription.already_expired";
         public const string CannotChangePlan = "subscription.cannot_change_plan";

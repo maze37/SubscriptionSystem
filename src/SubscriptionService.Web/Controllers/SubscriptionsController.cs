@@ -32,12 +32,9 @@ public sealed class SubscriptionsController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var command = new CreateSubscriptionCommand(
-            Guid.NewGuid(),
             request.UserId,
             request.PlanId,
-            Guid.NewGuid(),
-            request.WithTrial,
-            DateTimeOffset.UtcNow);
+            request.WithTrial);
 
         var result = await _sender.Send(command, cancellationToken)
             .ConfigureAwait(false);
@@ -83,7 +80,7 @@ public sealed class SubscriptionsController : ControllerBase
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var command = new CancelSubscriptionCommand(id, DateTimeOffset.UtcNow);
+        var command = new CancelSubscriptionCommand(id);
 
         var result = await _sender.Send(command, cancellationToken)
             .ConfigureAwait(false);
@@ -112,11 +109,7 @@ public sealed class SubscriptionsController : ControllerBase
         [FromBody] ChangePlanRequest request,
         CancellationToken cancellationToken = default)
     {
-        var command = new ChangePlanCommand(
-            id,
-            request.NewPlanId,
-            Guid.NewGuid(),
-            DateTimeOffset.UtcNow);
+        var command = new ChangePlanCommand(id, request.NewPlanId);
 
         var result = await _sender.Send(command, cancellationToken)
             .ConfigureAwait(false);
@@ -145,10 +138,7 @@ public sealed class SubscriptionsController : ControllerBase
         [FromBody] ActivateSubscriptionRequest request,
         CancellationToken cancellationToken = default)
     {
-        var command = new ActivateSubscriptionCommand(
-            id,
-            request.InvoiceId,
-            DateTimeOffset.UtcNow);
+        var command = new ActivateSubscriptionCommand(id, request.InvoiceId);
 
         var result = await _sender.Send(command, cancellationToken)
             .ConfigureAwait(false);
@@ -166,4 +156,3 @@ public sealed class SubscriptionsController : ControllerBase
         return NoContent();
     }
 }
-

@@ -5,6 +5,7 @@ using SubscriptionService.Domain.Enums;
 
 namespace SubscriptionService.Infrastructure.Repositories;
 
+/// Репозиторий для работы с агрегатом Subscription
 public class SubscriptionRepository : ISubscriptionRepository
 {
     private readonly AppDbContext _context;
@@ -14,6 +15,7 @@ public class SubscriptionRepository : ISubscriptionRepository
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
+    /// <inheritdoc/>
     public async Task<Subscription?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
         return await _context.Subscriptions
@@ -22,6 +24,7 @@ public class SubscriptionRepository : ISubscriptionRepository
             .ConfigureAwait(false);
     }
 
+    /// <inheritdoc/>
     public async Task<Subscription?> GetActiveByUserIdAsync(Guid userId, CancellationToken ct = default)
     {
         return await _context.Subscriptions
@@ -33,6 +36,7 @@ public class SubscriptionRepository : ISubscriptionRepository
             .ConfigureAwait(false);
     }
 
+    /// <inheritdoc/>
     public async Task<bool> HasActiveSubscriptionAsync(Guid userId, CancellationToken ct = default)
     {
         return await _context.Subscriptions
@@ -43,12 +47,14 @@ public class SubscriptionRepository : ISubscriptionRepository
             .ConfigureAwait(false);
     }
 
+    /// <inheritdoc/>
     public void Add(Subscription subscription)
     {
         ArgumentNullException.ThrowIfNull(subscription);
         _context.Subscriptions.Add(subscription);
     }
 
+    /// <inheritdoc/>
     public void Update(Subscription subscription)
     {
         ArgumentNullException.ThrowIfNull(subscription);

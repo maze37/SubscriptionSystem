@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using SharedKernel.Result;
+using SubscriptionService.Application.DTOs;
 using SubscriptionService.Application.UseCases.Users.Commands.RegisterUser;
 
 namespace SubscriptionService.Web.Controllers;
@@ -16,6 +17,7 @@ public sealed class UsersController : ControllerBase
         _sender = sender ?? throw new ArgumentNullException(nameof(sender));
     }
 
+    /// <summary>Зарегистрировать нового пользователя.</summary>
     [HttpPost]
     [ProducesResponseType(typeof(Guid), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -24,10 +26,7 @@ public sealed class UsersController : ControllerBase
         [FromBody] RegisterUserRequest request,
         CancellationToken cancellationToken = default)
     {
-        var command = new RegisterUserCommand(
-            Guid.NewGuid(),
-            request.Email,
-            DateTimeOffset.UtcNow);
+        var command = new RegisterUserCommand(request.Email);
 
         var result = await _sender.Send(command, cancellationToken)
             .ConfigureAwait(false);
@@ -46,5 +45,3 @@ public sealed class UsersController : ControllerBase
         return CreatedAtAction(nameof(Register), new { id = result.Value }, result.Value);
     }
 }
-
-public record RegisterUserRequest(string Email);

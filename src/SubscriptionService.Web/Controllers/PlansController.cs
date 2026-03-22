@@ -4,7 +4,6 @@ using SharedKernel.Result;
 using SubscriptionService.Application.DTOs;
 using SubscriptionService.Application.UseCases.Plans.Commands.CreatePlan;
 using SubscriptionService.Application.UseCases.Plans.Queries.GetActivePlans;
-using SubscriptionService.Domain.Enums;
 
 namespace SubscriptionService.Web.Controllers;
 
@@ -28,11 +27,9 @@ public sealed class PlansController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var command = new CreatePlanCommand(
-            Guid.NewGuid(),
             request.Name,
             request.Price,
-            request.BillingPeriod,
-            DateTimeOffset.UtcNow);
+            request.BillingPeriod);
 
         var result = await _sender.Send(command, cancellationToken)
             .ConfigureAwait(false);

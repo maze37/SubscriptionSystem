@@ -5,6 +5,10 @@ using SharedKernel.Result;
 
 namespace SubscriptionService.Application.UseCases.Subscriptions.Queries.GetSubscription;
 
+/// <summary>
+/// Обработчик запроса GetSubscriptionQuery.
+/// Возвращает подписку с историей счетов.
+/// </summary>
 public class GetSubscriptionQueryHandler : IQueryHandler<GetSubscriptionQuery, SubscriptionResponse>
 {
     private readonly ISubscriptionRepository _subscriptionRepository;
@@ -15,6 +19,7 @@ public class GetSubscriptionQueryHandler : IQueryHandler<GetSubscriptionQuery, S
                                   ?? throw new ArgumentNullException(nameof(subscriptionRepository));
     }
 
+    /// <inheritdoc/>
     public async Task<Result<SubscriptionResponse>> Handle(
         GetSubscriptionQuery query,
         CancellationToken cancellationToken)

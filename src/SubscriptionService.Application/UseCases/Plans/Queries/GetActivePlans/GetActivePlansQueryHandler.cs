@@ -5,6 +5,10 @@ using SharedKernel.Result;
 
 namespace SubscriptionService.Application.UseCases.Plans.Queries.GetActivePlans;
 
+/// <summary>
+/// Обработчик запроса GetActivePlansQuery.
+/// Возвращает все активные планы отсортированные по цене.
+/// </summary>
 public class GetActivePlansQueryHandler
     : IQueryHandler<GetActivePlansQuery, IReadOnlyList<PlanResponse>>
 {
@@ -16,6 +20,7 @@ public class GetActivePlansQueryHandler
                           ?? throw new ArgumentNullException(nameof(planRepository));
     }
 
+    /// <inheritdoc/>
     public async Task<Result<IReadOnlyList<PlanResponse>>> Handle(
         GetActivePlansQuery query,
         CancellationToken cancellationToken)

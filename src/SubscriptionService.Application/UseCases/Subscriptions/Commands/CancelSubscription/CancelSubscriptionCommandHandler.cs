@@ -4,19 +4,27 @@ using SharedKernel.Result;
 
 namespace SubscriptionService.Application.UseCases.Subscriptions.Commands.CancelSubscription;
 
+/// <summary>
+/// Обработчик команды CancelSubscriptionCommand.
+/// Находит подписку и устанавливает CancelAtPeriodEnd = true.
+/// </summary>
 public class CancelSubscriptionCommandHandler : ICommandHandler<CancelSubscriptionCommand>
 {
     private readonly ISubscriptionRepository _subscriptionRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IDateTimeProvider _dateTime;
 
     public CancelSubscriptionCommandHandler(
         ISubscriptionRepository subscriptionRepository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IDateTimeProvider dateTime)
     {
         _subscriptionRepository = subscriptionRepository ?? throw new ArgumentNullException(nameof(subscriptionRepository));
         _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
+        _dateTime = dateTime ?? throw new ArgumentNullException(nameof(dateTime));
     }
 
+    /// <inheritdoc/>
     public async Task<Result> Handle(
         CancelSubscriptionCommand command,
         CancellationToken cancellationToken)
@@ -29,7 +37,7 @@ public class CancelSubscriptionCommandHandler : ICommandHandler<CancelSubscripti
             return Result.Failure(
                 Error.NotFound($"Подписка с ID '{command.SubscriptionId}' не найдена."));
 
-        subscription.Cancel(command.CancelledWhen);
+        subscription.Cancel(_dateTime.UtcNow);
 
         _subscriptionRepository.Update(subscription);
 

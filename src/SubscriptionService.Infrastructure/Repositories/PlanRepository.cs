@@ -4,6 +4,7 @@ using SubscriptionService.Domain.Aggregates.Plan;
 
 namespace SubscriptionService.Infrastructure.Repositories;
 
+/// Репозиторий для работы с агрегатом Plan
 public class PlanRepository : IPlanRepository
 {
     private readonly AppDbContext _context;
@@ -13,6 +14,7 @@ public class PlanRepository : IPlanRepository
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
+    /// <inheritdoc/>
     public async Task<Plan?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
         return await _context.Plans
@@ -20,6 +22,7 @@ public class PlanRepository : IPlanRepository
             .ConfigureAwait(false);
     }
 
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<Plan>> GetAllActiveAsync(CancellationToken ct = default)
     {
         return await _context.Plans
@@ -28,7 +31,8 @@ public class PlanRepository : IPlanRepository
             .ToListAsync(ct)
             .ConfigureAwait(false);
     }
-
+    
+    /// <inheritdoc/>
     public void Add(Plan plan)
     {
         ArgumentNullException.ThrowIfNull(plan);

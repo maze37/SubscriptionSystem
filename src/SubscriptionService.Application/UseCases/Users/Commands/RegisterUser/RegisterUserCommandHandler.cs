@@ -1,23 +1,31 @@
 using SubscriptionService.Application.Abstractions;
 using SubscriptionService.Application.Abstractions.Core;
-using SharedKernel.Result;
 using SubscriptionService.Domain.Aggregates.User;
+using SharedKernel.Result;
 
 namespace SubscriptionService.Application.UseCases.Users.Commands.RegisterUser;
 
+/// <summary>
+/// Обработчик команды RegisterUserCommand.
+/// Проверяет уникальность email, создаёт пользователя и сохраняет.
+/// </summary>
 public class RegisterUserCommandHandler : ICommandHandler<RegisterUserCommand, Guid>
 {
     private readonly IUserRepository _userRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IDateTimeProvider _dateTime;
 
     public RegisterUserCommandHandler(
         IUserRepository userRepository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IDateTimeProvider dateTime)
     {
         _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
         _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
+        _dateTime = dateTime ?? throw new ArgumentNullException(nameof(dateTime));
     }
 
+    /// <inheritdoc/>
     public async Task<Result<Guid>> Handle(
         RegisterUserCommand command,
         CancellationToken cancellationToken)
@@ -31,9 +39,9 @@ public class RegisterUserCommandHandler : ICommandHandler<RegisterUserCommand, G
                 Error.Conflict($"Пользователь с email '{command.Email}' уже существует."));
 
         var user = User.Create(
-            command.Id,
+            Guid.NewGuid(),
             command.Email,
-            command.CreatedWhen);
+            _dateTime.UtcNow);
 
         _userRepository.Add(user);
 

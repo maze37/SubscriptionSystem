@@ -2,6 +2,10 @@ using FluentValidation;
 
 namespace SubscriptionService.Application.UseCases.Subscriptions.Commands.ActivateSubscription;
 
+/// <summary>
+/// Валидатор команды ActivateSubscriptionCommand.
+/// Запускается автоматически через ValidationBehavior до хендлера.
+/// </summary>
 public class ActivateSubscriptionCommandValidator : AbstractValidator<ActivateSubscriptionCommand>
 {
     public ActivateSubscriptionCommandValidator()

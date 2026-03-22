@@ -2,13 +2,14 @@ using FluentValidation;
 
 namespace SubscriptionService.Application.UseCases.Plans.Commands.CreatePlan;
 
+/// <summary>
+/// Валидатор команды CreatePlanCommand.
+/// Запускается автоматически через ValidationBehavior до хендлера.
+/// </summary>
 public class CreatePlanCommandValidator : AbstractValidator<CreatePlanCommand>
 {
     public CreatePlanCommandValidator()
     {
-        RuleFor(x => x.Id)
-            .NotEmpty().WithMessage("ID плана не может быть пустым.");
-
         RuleFor(x => x.Name)
             .NotEmpty().WithMessage("Название плана не может быть пустым.");
 

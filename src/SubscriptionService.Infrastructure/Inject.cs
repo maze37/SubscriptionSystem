@@ -31,6 +31,8 @@ public static class Inject
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IPlanRepository, PlanRepository>();
         services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
+        
+        services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
 
         return services;
     }

@@ -3,9 +3,11 @@ using SubscriptionService.Domain.Enums;
 
 namespace SubscriptionService.Application.UseCases.Plans.Commands.CreatePlan;
 
+/// <summary>Команда создания нового тарифного плана.</summary>
+/// <param name="Name">Название плана.</param>
+/// <param name="Price">Цена плана - больше нуля.</param>
+/// <param name="BillingPeriod">Период оплаты — месяц или год.</param>
 public record CreatePlanCommand(
-    Guid Id,
     string Name,
     decimal Price,
-    BillingPeriod BillingPeriod,
-    DateTimeOffset CreatedWhen) : ICommand<Guid>;
+    BillingPeriod BillingPeriod) : ICommand<Guid>;

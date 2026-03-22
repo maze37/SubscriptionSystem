@@ -5,6 +5,9 @@ using SubscriptionService.Domain.Aggregates.User;
 
 namespace SubscriptionService.Infrastructure.Repositories;
 
+/// <summary>
+/// Репозиторий для работы с агрегатом User
+/// </summary>
 public class UserRepository : IUserRepository
 {
     private readonly AppDbContext _context;
@@ -14,6 +17,7 @@ public class UserRepository : IUserRepository
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
+    /// <inheritdoc/>
     public async Task<User?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
         return await _context.Users
@@ -21,6 +25,7 @@ public class UserRepository : IUserRepository
             .ConfigureAwait(false);
     }
 
+    /// <inheritdoc/>
     public async Task<bool> ExistsByEmailAsync(string email, CancellationToken ct = default)
     {
         return await _context.Users
@@ -28,6 +33,7 @@ public class UserRepository : IUserRepository
             .ConfigureAwait(false);
     }
 
+    /// <inheritdoc/>
     public void Add(User user)
     {
         ArgumentNullException.ThrowIfNull(user);
