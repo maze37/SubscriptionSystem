@@ -93,6 +93,8 @@ Trial → Active → Cancelled
 
 ## Запуск
 
+#### **Не забудьте изменить "YOUR_PASSWORD" в appsettings.json**
+
 **Требования:** Docker, .NET 10 SDK
 ```bash
 # Клонировать репозиторий
@@ -110,5 +112,3 @@ dotnet ef database update \
 # Запустить приложение
 dotnet run --project src/SubscriptionService.Web
 ```
-
-Swagger UI: `http://localhost:5XXX/swagger`
