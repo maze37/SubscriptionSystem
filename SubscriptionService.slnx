@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="compose.yaml" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/SharedKernel/SharedKernel.csproj" />
+    <Project Path="src/SubscriptionService.Application/SubscriptionService.Application.csproj" />
+    <Project Path="src/SubscriptionService.Domain/SubscriptionService.Domain.csproj" />
+    <Project Path="src/SubscriptionService.Infrastructure/SubscriptionService.Infrastructure.csproj" />
+    <Project Path="src/SubscriptionService.Web/SubscriptionService.Web.csproj" />
+  </Folder>
+</Solution>
