@@ -25,7 +25,7 @@ public class CancelSubscriptionCommandHandler : ICommandHandler<CancelSubscripti
     }
 
     /// <inheritdoc/>
-    public async Task<Result> Handle(
+    public async Task<Result<Error>> Handle(
         CancelSubscriptionCommand command,
         CancellationToken cancellationToken)
     {
@@ -34,7 +34,7 @@ public class CancelSubscriptionCommandHandler : ICommandHandler<CancelSubscripti
             .ConfigureAwait(false);
 
         if (subscription is null)
-            return Result.Failure(
+            return Result<Error>.Failure(
                 Error.NotFound($"Подписка с ID '{command.SubscriptionId}' не найдена."));
 
         subscription.Cancel(_dateTime.UtcNow);
@@ -45,6 +45,6 @@ public class CancelSubscriptionCommandHandler : ICommandHandler<CancelSubscripti
             .SaveChangesAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        return Result.Success();
+        return Result<Error>.Success();
     }
 }

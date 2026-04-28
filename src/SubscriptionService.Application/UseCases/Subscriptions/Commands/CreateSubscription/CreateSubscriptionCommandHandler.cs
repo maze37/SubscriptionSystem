@@ -33,7 +33,7 @@ public class CreateSubscriptionCommandHandler : ICommandHandler<CreateSubscripti
     }
 
     /// <inheritdoc/>
-    public async Task<Result<Guid>> Handle(
+    public async Task<Result<Guid, Error>> Handle(
         CreateSubscriptionCommand command,
         CancellationToken cancellationToken)
     {
@@ -42,11 +42,11 @@ public class CreateSubscriptionCommandHandler : ICommandHandler<CreateSubscripti
             .ConfigureAwait(false);
 
         if (user is null)
-            return Result<Guid>.Failure(
+            return Result<Guid, Error>.Failure(
                 Error.NotFound($"Пользователь с ID '{command.UserId}' не найден."));
 
         if (command.WithTrial && user.HasUsedTrial)
-            return Result<Guid>.Failure(
+            return Result<Guid, Error>.Failure(
                 Error.Conflict("Триальный период уже был использован."));
 
         var hasActive = await _subscriptionRepository
@@ -54,7 +54,7 @@ public class CreateSubscriptionCommandHandler : ICommandHandler<CreateSubscripti
             .ConfigureAwait(false);
 
         if (hasActive)
-            return Result<Guid>.Failure(
+            return Result<Guid, Error>.Failure(
                 Error.Conflict("У пользователя уже есть активная подписка."));
 
         var plan = await _planRepository
@@ -62,11 +62,11 @@ public class CreateSubscriptionCommandHandler : ICommandHandler<CreateSubscripti
             .ConfigureAwait(false);
 
         if (plan is null)
-            return Result<Guid>.Failure(
+            return Result<Guid, Error>.Failure(
                 Error.NotFound($"План с ID '{command.PlanId}' не найден."));
 
         if (!plan.IsActive)
-            return Result<Guid>.Failure(
+            return Result<Guid, Error>.Failure(
                 Error.Conflict("Нельзя подписаться на неактивный план."));
 
         if (command.WithTrial)
@@ -78,6 +78,7 @@ public class CreateSubscriptionCommandHandler : ICommandHandler<CreateSubscripti
             command.PlanId,
             Guid.NewGuid(),
             plan.Price,
+            plan.BillingPeriod,
             command.WithTrial,
             _dateTime.UtcNow);
 
@@ -87,6 +88,6 @@ public class CreateSubscriptionCommandHandler : ICommandHandler<CreateSubscripti
             .SaveChangesAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        return Result<Guid>.Success(subscription.Id);
+        return Result<Guid, Error>.Success(subscription.Id);
     }
 }

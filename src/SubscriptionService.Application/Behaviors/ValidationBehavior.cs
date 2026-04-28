@@ -7,7 +7,7 @@ namespace SubscriptionService.Application.Behaviors;
 /// <summary>
 /// MediatR Pipeline Behavior — перехватывает каждый запрос до хендлера
 /// и запускает все FluentValidation валидаторы для него.
-/// Если валидация не прошла — хендлер не вызывается, возвращается Result.Failure.
+/// Если валидация не прошла — хендлер не вызывается, возвращается failure result.
 /// </summary>
 public class ValidationBehavior<TRequest, TResponse>
     : IPipelineBehavior<TRequest, TResponse>
@@ -45,20 +45,29 @@ public class ValidationBehavior<TRequest, TResponse>
 
         var responseType = typeof(TResponse);
         
-        if (responseType == typeof(Result))
-            return (TResponse)(object)Result.Failure(error);
-        
         if (responseType.IsGenericType &&
             responseType.GetGenericTypeDefinition() == typeof(Result<>))
         {
-            var genericArg = responseType.GetGenericArguments()[0];
-            var resultType = typeof(Result<>).MakeGenericType(genericArg);
+            var resultType = typeof(Result<>).MakeGenericType(typeof(Error));
             var failureMethod = resultType.GetMethod(
                 "Failure",
                 System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static,
                 new[] { typeof(Error) });
 
-            return (TResponse)failureMethod!.Invoke(null, new object[] { error })!;
+            return (TResponse)failureMethod!.Invoke(null, [error])!;
+        }
+
+        if (responseType.IsGenericType &&
+            responseType.GetGenericTypeDefinition() == typeof(Result<,>))
+        {
+            var genericArg = responseType.GetGenericArguments()[0];
+            var resultType = typeof(Result<,>).MakeGenericType(genericArg, typeof(Error));
+            var failureMethod = resultType.GetMethod(
+                "Failure",
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static,
+                new[] { typeof(Error) });
+
+            return (TResponse)failureMethod!.Invoke(null, [error])!;
         }
 
         return await next();

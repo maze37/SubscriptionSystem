@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text.Json;
 using SharedKernel.Exceptions;
+using SharedKernel.Result;
+using SubscriptionService.Web.Contracts;
 
 namespace SubscriptionService.Web.Middlewares;
 
@@ -53,12 +55,8 @@ public sealed class ExceptionMiddleware
         context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
         context.Response.ContentType = "application/json";
 
-        var response = new
-        {
-            errorCode = ex.Code,
-            errorMessage = ex.Message,
-            field = ex.Field
-        };
+        var error = Error.Validation(ex.Message, ex.Field);
+        var response = EndpointResult.Failure(error, context);
 
         await context.Response.WriteAsync(
             JsonSerializer.Serialize(response, JsonOptions))
@@ -73,11 +71,9 @@ public sealed class ExceptionMiddleware
         context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
         context.Response.ContentType = "application/json";
 
-        var response = new
-        {
-            errorCode = "internal_server_error",
-            errorMessage = "Произошла непредвиденная ошибка."
-        };
+        var response = EndpointResult.Failure(
+            Error.Failure("Произошла непредвиденная ошибка."),
+            context);
 
         await context.Response.WriteAsync(
             JsonSerializer.Serialize(response, JsonOptions))

@@ -24,7 +24,7 @@ REST API для управления подписками пользовател
 src/
 ├── SharedKernel/                    # Базовые DDD строительные блоки
 │   ├── Base/                        # Entity, AggregateRoot, ValueObject
-│   ├── Result/                      # Result Pattern, Error
+│   ├── Result/                      # Result<TValue, Error>, Result<Error>, Error
 │   └── Exceptions/                  # DomainException
 │
 ├── SubscriptionService.Domain/      # Доменный слой
@@ -52,8 +52,53 @@ src/
 └── SubscriptionService.Web/         # Web слой
     ├── Controllers/                 # UsersController, PlansController, SubscriptionsController
     ├── Middlewares/                 # ExceptionMiddleware, RequestLoggingMiddleware
+    ├── Contracts/                   # EndpointEnvelope, EndpointResult
     └── Program.cs
 ```
+
+## Обработка ошибок и Result pattern
+
+В приложении используется типизированный результат:
+
+- `Result<TValue, Error>` — для операций с полезной нагрузкой
+- `Result<Error>` — для операций без payload
+
+Ошибки возвращаются явно как `Error` (с `ErrorType`), а не через исключения в application-слое.
+
+## Формат HTTP-ответов (Envelope)
+
+Все контроллеры возвращают единый envelope для фронтенда:
+
+```json
+{
+  "success": true,
+  "data": { },
+  "error": null,
+  "traceId": "0H..."
+}
+```
+
+Для ошибок:
+
+```json
+{
+  "success": false,
+  "data": null,
+  "error": {
+    "errorCode": "409",
+    "errorMessage": "..."
+  },
+  "traceId": "0H..."
+}
+```
+
+Маппинг `ErrorType -> HTTP status`:
+
+- `Validation`, `Null` -> `400 BadRequest`
+- `NotFound` -> `404 NotFound`
+- `Conflict` -> `409 Conflict`
+- `Forbidden` -> `403 Forbidden`
+- прочие -> `500 InternalServerError`
 
 ## Доменная модель
 
@@ -90,6 +135,12 @@ Trial -> Active -> Cancelled
 | `POST` | `/api/subscriptions/{id}/cancel` | Отменить подписку |
 | `POST` | `/api/subscriptions/{id}/change-plan` | Сменить план |
 | `POST` | `/api/subscriptions/{id}/activate` | Активировать после оплаты |
+
+### Коды успешных ответов
+
+- `POST /api/users`, `POST /api/plans`, `POST /api/subscriptions` -> `201 Created` + envelope
+- `GET /api/plans/active`, `GET /api/subscriptions/{id}` -> `200 OK` + envelope
+- `POST /api/subscriptions/{id}/cancel`, `change-plan`, `activate` -> `200 OK` + envelope
 
 ## Запуск
 

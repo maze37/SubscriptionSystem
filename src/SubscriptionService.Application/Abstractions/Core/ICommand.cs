@@ -4,8 +4,8 @@ using SharedKernel.Result;
 namespace SubscriptionService.Application.Abstractions.Core;
 
 /// <summary>Маркер команды без возвращаемого значения.</summary>
-public interface ICommand : IRequest<Result> { }
+public interface ICommand : IRequest<Result<Error>> { }
 
 /// <summary>Маркер команды с возвращаемым значением.</summary>
 /// <typeparam name="TResponse">Тип возвращаемых данных.</typeparam>
-public interface ICommand<TResponse> : IRequest<Result<TResponse>> { }
+public interface ICommand<TResponse> : IRequest<Result<TResponse, Error>> { }

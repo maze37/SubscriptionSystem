@@ -25,6 +25,7 @@ public static class DomainErrors
     public static class Plan
     {
         public const string InvalidId = "plan.invalid_id";
+        public const string InvalidBillingPeriod = "plan.invalid_billing_period";
         public const string AlreadyActive = "plan.already_active";
         public const string AlreadyDeactivated = "plan.already_deactivated";
     }

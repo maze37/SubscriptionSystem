@@ -67,6 +67,19 @@ public class Subscription : AggregateRoot
         CreatedWhen = createdWhen;
     }
 
+    private static DateTimeOffset CalculatePeriodEnd(
+        DateTimeOffset startedWhen,
+        BillingPeriod billingPeriod) =>
+        billingPeriod switch
+        {
+            BillingPeriod.Monthly => startedWhen.AddMonths(1),
+            BillingPeriod.Yearly => startedWhen.AddYears(1),
+            _ => throw new DomainException(
+                DomainErrors.Plan.InvalidBillingPeriod,
+                $"Неподдерживаемый billing period '{billingPeriod}'.",
+                nameof(billingPeriod))
+        };
+
     /// <summary>
     /// Создать новую подписку.
     /// Если withTrial = true — подписка начинается с триального периода (14 дней).
@@ -78,6 +91,7 @@ public class Subscription : AggregateRoot
         Guid planId,
         Guid invoiceId,
         Money price,
+        BillingPeriod billingPeriod,
         bool withTrial,
         DateTimeOffset createdWhen)
     {
@@ -124,7 +138,7 @@ public class Subscription : AggregateRoot
             userId,
             planId,
             SubscriptionStatus.Active,
-            currentPeriodEnd: createdWhen.AddMonths(1),
+            currentPeriodEnd: CalculatePeriodEnd(createdWhen, billingPeriod),
             createdWhen: createdWhen);
 
         var invoice = Invoice.Create(
@@ -205,6 +219,7 @@ public class Subscription : AggregateRoot
     public void Renew(
         Guid invoiceId,
         Money price,
+        BillingPeriod billingPeriod,
         DateTimeOffset renewedWhen)
     {
         if (CancelAtPeriodEnd)
@@ -224,7 +239,7 @@ public class Subscription : AggregateRoot
                 "ID счёта не может быть пустым.",
                 nameof(invoiceId));
         
-        CurrentPeriodEnd = renewedWhen.AddMonths(1);
+        CurrentPeriodEnd = CalculatePeriodEnd(renewedWhen, billingPeriod);
         
         var invoice = Invoice.Create(
             invoiceId,
@@ -238,7 +253,10 @@ public class Subscription : AggregateRoot
     /// <summary>
     /// Активировать подписку после оплаты счёта.
     /// </summary>
-    public void Activate(Guid invoiceId, DateTimeOffset activatedWhen)
+    public void Activate(
+        Guid invoiceId,
+        BillingPeriod billingPeriod,
+        DateTimeOffset activatedWhen)
     {
         var invoice = _invoices.FirstOrDefault(i => i.Id == invoiceId);
 
@@ -250,7 +268,7 @@ public class Subscription : AggregateRoot
         invoice.MarkAsPaid(activatedWhen);
 
         Status = SubscriptionStatus.Active;
-        CurrentPeriodEnd = activatedWhen.AddMonths(1);
+        CurrentPeriodEnd = CalculatePeriodEnd(activatedWhen, billingPeriod);
     }
 
     /// <summary>

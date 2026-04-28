@@ -56,13 +56,13 @@ public class Error
         new(ErrorCodes.NotFound.ToString(CultureInfo.InvariantCulture), errorMessage, ErrorType.NotFound);
     
     public static Error Forbidden(string errorMessage) =>
-        new(ErrorCodes.Forbidden.ToString(CultureInfo.InvariantCulture), errorMessage, ErrorType.Conflict);
+        new(ErrorCodes.Forbidden.ToString(CultureInfo.InvariantCulture), errorMessage, ErrorType.Forbidden);
 
     public static Error Conflict(string errorMessage) =>
         new(ErrorCodes.Conflict.ToString(), errorMessage, ErrorType.Conflict);
     
     public static Error Null(string errorMessage, string? invalidField = null) =>
-        new(ErrorCodes.NotFound.ToString(), errorMessage, ErrorType.Null, invalidField);
+        new(ErrorCodes.BadRequest.ToString(CultureInfo.InvariantCulture), errorMessage, ErrorType.Null, invalidField);
 #pragma warning restore CA1305
 
     public ErrorList ToErrorList() => new([this]);

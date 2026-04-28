@@ -20,7 +20,7 @@ public class GetSubscriptionQueryHandler : IQueryHandler<GetSubscriptionQuery, S
     }
 
     /// <inheritdoc/>
-    public async Task<Result<SubscriptionResponse>> Handle(
+    public async Task<Result<SubscriptionResponse, Error>> Handle(
         GetSubscriptionQuery query,
         CancellationToken cancellationToken)
     {
@@ -29,24 +29,9 @@ public class GetSubscriptionQueryHandler : IQueryHandler<GetSubscriptionQuery, S
             .ConfigureAwait(false);
 
         if (subscription is null)
-            return Result<SubscriptionResponse>.Failure(
+            return Result<SubscriptionResponse, Error>.Failure(
                 Error.NotFound($"Подписка с ID '{query.SubscriptionId}' не найдена."));
 
-        return Result<SubscriptionResponse>.Success(new SubscriptionResponse(
-            subscription.Id,
-            subscription.UserId,
-            subscription.PlanId,
-            subscription.Status,
-            subscription.CurrentPeriodEnd,
-            subscription.CancelAtPeriodEnd,
-            subscription.TrialEnd,
-            subscription.CreatedWhen,
-            subscription.Invoices.Select(i => new InvoiceResponse(
-                i.Id,
-                i.Amount.Value,
-                i.Status,
-                i.DueDate,
-                i.CreatedWhen,
-                i.PaidWhen)).ToList()));
+        return Result<SubscriptionResponse, Error>.Success(subscription.ToResponse());
     }
 }

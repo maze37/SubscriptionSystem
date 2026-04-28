@@ -1,12 +1,12 @@
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using SharedKernel.Result;
 using SubscriptionService.Application.DTOs;
 using SubscriptionService.Application.UseCases.Subscriptions.Commands.ActivateSubscription;
 using SubscriptionService.Application.UseCases.Subscriptions.Commands.CancelSubscription;
 using SubscriptionService.Application.UseCases.Subscriptions.Commands.ChangePlan;
 using SubscriptionService.Application.UseCases.Subscriptions.Commands.CreateSubscription;
 using SubscriptionService.Application.UseCases.Subscriptions.Queries.GetSubscription;
+using SubscriptionService.Web.Extensions;
 
 namespace SubscriptionService.Web.Controllers;
 
@@ -39,19 +39,7 @@ public sealed class SubscriptionsController : ControllerBase
         var result = await _sender.Send(command, cancellationToken)
             .ConfigureAwait(false);
 
-        if (result.IsFailure)
-        {
-            var error = result.Errors.First();
-            return error.Type switch
-            {
-                ErrorType.NotFound => NotFound(result.Errors),
-                ErrorType.Conflict => Conflict(result.Errors),
-                ErrorType.Validation => BadRequest(result.Errors),
-                _ => StatusCode(500, result.Errors)
-            };
-        }
-
-        return CreatedAtAction(nameof(GetById), new { id = result.Value }, result.Value);
+        return this.FromResult(result, nameof(GetById), new { id = result.Value });
     }
 
     /// <summary>Получить подписку по ID.</summary>
@@ -65,10 +53,7 @@ public sealed class SubscriptionsController : ControllerBase
         var result = await _sender.Send(new GetSubscriptionQuery(id), cancellationToken)
             .ConfigureAwait(false);
 
-        if (result.IsFailure)
-            return NotFound(result.Errors);
-
-        return Ok(result.Value);
+        return this.FromResult(result);
     }
 
     /// <summary>Отменить подписку.</summary>
@@ -85,18 +70,7 @@ public sealed class SubscriptionsController : ControllerBase
         var result = await _sender.Send(command, cancellationToken)
             .ConfigureAwait(false);
 
-        if (result.IsFailure)
-        {
-            var error = result.Errors.First();
-            return error.Type switch
-            {
-                ErrorType.NotFound => NotFound(result.Errors),
-                ErrorType.Conflict => Conflict(result.Errors),
-                _ => StatusCode(500, result.Errors)
-            };
-        }
-
-        return NoContent();
+        return this.FromResult(result);
     }
 
     /// <summary>Сменить тарифный план.</summary>
@@ -114,19 +88,7 @@ public sealed class SubscriptionsController : ControllerBase
         var result = await _sender.Send(command, cancellationToken)
             .ConfigureAwait(false);
 
-        if (result.IsFailure)
-        {
-            var error = result.Errors.First();
-            return error.Type switch
-            {
-                ErrorType.NotFound => NotFound(result.Errors),
-                ErrorType.Conflict => Conflict(result.Errors),
-                ErrorType.Validation => BadRequest(result.Errors),
-                _ => StatusCode(500, result.Errors)
-            };
-        }
-
-        return NoContent();
+        return this.FromResult(result);
     }
 
     /// <summary>Активировать подписку после оплаты счёта.</summary>
@@ -143,16 +105,6 @@ public sealed class SubscriptionsController : ControllerBase
         var result = await _sender.Send(command, cancellationToken)
             .ConfigureAwait(false);
 
-        if (result.IsFailure)
-        {
-            var error = result.Errors.First();
-            return error.Type switch
-            {
-                ErrorType.NotFound => NotFound(result.Errors),
-                _ => StatusCode(500, result.Errors)
-            };
-        }
-
-        return NoContent();
+        return this.FromResult(result);
     }
 }

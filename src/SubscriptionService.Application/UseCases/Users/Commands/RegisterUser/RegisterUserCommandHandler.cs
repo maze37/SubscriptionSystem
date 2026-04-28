@@ -26,7 +26,7 @@ public class RegisterUserCommandHandler : ICommandHandler<RegisterUserCommand, G
     }
 
     /// <inheritdoc/>
-    public async Task<Result<Guid>> Handle(
+    public async Task<Result<Guid, Error>> Handle(
         RegisterUserCommand command,
         CancellationToken cancellationToken)
     {
@@ -35,7 +35,7 @@ public class RegisterUserCommandHandler : ICommandHandler<RegisterUserCommand, G
             .ConfigureAwait(false);
 
         if (emailExists)
-            return Result<Guid>.Failure(
+            return Result<Guid, Error>.Failure(
                 Error.Conflict($"Пользователь с email '{command.Email}' уже существует."));
 
         var user = User.Create(
@@ -49,6 +49,6 @@ public class RegisterUserCommandHandler : ICommandHandler<RegisterUserCommand, G
             .SaveChangesAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        return Result<Guid>.Success(user.Id);
+        return Result<Guid, Error>.Success(user.Id);
     }
 }

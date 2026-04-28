@@ -1,9 +1,9 @@
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using SharedKernel.Result;
 using SubscriptionService.Application.DTOs;
 using SubscriptionService.Application.UseCases.Plans.Commands.CreatePlan;
 using SubscriptionService.Application.UseCases.Plans.Queries.GetActivePlans;
+using SubscriptionService.Web.Extensions;
 
 namespace SubscriptionService.Web.Controllers;
 
@@ -34,17 +34,7 @@ public sealed class PlansController : ControllerBase
         var result = await _sender.Send(command, cancellationToken)
             .ConfigureAwait(false);
 
-        if (result.IsFailure)
-        {
-            var error = result.Errors.First();
-            return error.Type switch
-            {
-                ErrorType.Validation => BadRequest(result.Errors),
-                _ => StatusCode(500, result.Errors)
-            };
-        }
-
-        return CreatedAtAction(nameof(GetActive), new { id = result.Value }, result.Value);
+        return this.FromResult(result, nameof(GetActive), new { id = result.Value });
     }
 
     /// <summary>Получить все активные планы.</summary>
@@ -55,6 +45,6 @@ public sealed class PlansController : ControllerBase
         var result = await _sender.Send(new GetActivePlansQuery(), cancellationToken)
             .ConfigureAwait(false);
 
-        return Ok(result.Value);
+        return this.FromResult(result);
     }
 }

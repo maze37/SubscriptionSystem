@@ -9,5 +9,5 @@ namespace SubscriptionService.Application.Abstractions.Core;
 /// <typeparam name="TQuery">Тип запроса.</typeparam>
 /// <typeparam name="TResponse">Тип возвращаемых данных.</typeparam>
 public interface IQueryHandler<TQuery, TResponse>
-    : IRequestHandler<TQuery, Result<TResponse>>
+    : IRequestHandler<TQuery, Result<TResponse, Error>>
     where TQuery : IQuery<TResponse> { }

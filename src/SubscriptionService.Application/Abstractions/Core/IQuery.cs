@@ -7,4 +7,4 @@ namespace SubscriptionService.Application.Abstractions.Core;
 /// Маркер запроса — не изменяет состояние системы, только читает данные.
 /// </summary>
 /// <typeparam name="TResponse">Тип возвращаемых данных.</typeparam>
-public interface IQuery<TResponse> : IRequest<Result<TResponse>> { }
+public interface IQuery<TResponse> : IRequest<Result<TResponse, Error>> { }

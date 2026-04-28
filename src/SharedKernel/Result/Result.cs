@@ -1,62 +1,35 @@
 namespace SharedKernel.Result;
 
-public class Result
+public sealed class Result<TError>
 {
-    public Result(bool isSuccess, IEnumerable<Error> errors)
+    private Result(bool isSuccess, TError? error)
     {
-        if (isSuccess && errors.Any(x => x != Error.None))
-            throw new InvalidOperationException();
-
-        if (!isSuccess && errors.Any(x => x == Error.None))
-            throw new InvalidOperationException();
-
         IsSuccess = isSuccess;
-        Errors = errors.ToList();
+        Error = error;
     }
 
-    public ErrorList Errors { get; set; }
     public bool IsSuccess { get; }
     public bool IsFailure => !IsSuccess;
+    public TError? Error { get; }
 
-    public static Result Success() => new(true, [Error.None]);
-    public static Result Failure(Error error) => new(false, [error]);
-    public static implicit operator Result(Error error) => new( false, [error]);
-    public static implicit operator Result(ErrorList errors) => new( false, errors);
-
-    public override string ToString()
-    {
-        return string.Join("\n", Errors);
-    }
-
-    public Result ToResult()
-    {
-        throw new NotImplementedException();
-    }
+    public static Result<TError> Success() => new(true, default);
+    public static Result<TError> Failure(TError error) => new(false, error);
 }
 
-public class Result<TValue> : Result
+public sealed class Result<TValue, TError>
 {
-    public Result(TValue value,bool isSuccess, IEnumerable<Error> errors)
-        : base(isSuccess, errors)
+    private Result(TValue? value, bool isSuccess, TError? error)
     {
-        _value = value;
+        Value = value;
+        IsSuccess = isSuccess;
+        Error = error;
     }
 
-    private readonly TValue _value;
+    public TValue? Value { get; }
+    public bool IsSuccess { get; }
+    public bool IsFailure => !IsSuccess;
+    public TError? Error { get; }
 
-    public TValue Value => IsSuccess
-        ? _value
-        : throw new InvalidOperationException("The value of a failure result cannot be accessed");
-
-    public static Result<TValue> Success(TValue value) => new(value, true, [Error.None]);
-    public static new Result<TValue> Failure(Error error) => new(default!, false, [error]);
-
-    public static implicit operator Result<TValue>(TValue value) => new(value, true, [Error.None]);
-    public static implicit operator Result<TValue>(Error error) => new(default!, false, [error]);
-    public static implicit operator Result<TValue>(ErrorList errors) => new(default!, false, errors);
-    
-    public new Result<TValue> ToResult()
-    {
-        throw new NotImplementedException();
-    }
+    public static Result<TValue, TError> Success(TValue value) => new(value, true, default);
+    public static Result<TValue, TError> Failure(TError error) => new(default, false, error);
 }

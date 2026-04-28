@@ -27,7 +27,7 @@ public class CreatePlanCommandHandler : ICommandHandler<CreatePlanCommand, Guid>
     }
 
     /// <inheritdoc/>
-    public async Task<Result<Guid>> Handle(
+    public async Task<Result<Guid, Error>> Handle(
         CreatePlanCommand command,
         CancellationToken cancellationToken)
     {
@@ -44,6 +44,6 @@ public class CreatePlanCommandHandler : ICommandHandler<CreatePlanCommand, Guid>
             .SaveChangesAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        return Result<Guid>.Success(plan.Id);
+        return Result<Guid, Error>.Success(plan.Id);
     }
 }

@@ -21,7 +21,7 @@ public class GetActivePlansQueryHandler
     }
 
     /// <inheritdoc/>
-    public async Task<Result<IReadOnlyList<PlanResponse>>> Handle(
+    public async Task<Result<IReadOnlyList<PlanResponse>, Error>> Handle(
         GetActivePlansQuery query,
         CancellationToken cancellationToken)
     {
@@ -30,14 +30,9 @@ public class GetActivePlansQueryHandler
             .ConfigureAwait(false);
 
         var response = plans
-            .Select(p => new PlanResponse(
-                p.Id,
-                p.Name,
-                p.Price,
-                p.BillingPeriod,
-                p.IsActive))
+            .Select(p => p.ToResponse())
             .ToList();
 
-        return Result<IReadOnlyList<PlanResponse>>.Success(response);
+        return Result<IReadOnlyList<PlanResponse>, Error>.Success(response);
     }
 }

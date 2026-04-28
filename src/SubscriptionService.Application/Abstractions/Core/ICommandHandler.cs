@@ -9,7 +9,7 @@ namespace SubscriptionService.Application.Abstractions.Core;
 /// </summary>
 /// <typeparam name="TCommand">Тип команды.</typeparam>
 public interface ICommandHandler<TCommand>
-    : IRequestHandler<TCommand, Result>
+    : IRequestHandler<TCommand, Result<Error>>
     where TCommand : ICommand { }
 
 /// <summary>
@@ -19,5 +19,5 @@ public interface ICommandHandler<TCommand>
 /// <typeparam name="TCommand">Тип команды.</typeparam>
 /// <typeparam name="TResponse">Тип возвращаемых данных.</typeparam>
 public interface ICommandHandler<TCommand, TResponse>
-    : IRequestHandler<TCommand, Result<TResponse>>
+    : IRequestHandler<TCommand, Result<TResponse, Error>>
     where TCommand : ICommand<TResponse> { }

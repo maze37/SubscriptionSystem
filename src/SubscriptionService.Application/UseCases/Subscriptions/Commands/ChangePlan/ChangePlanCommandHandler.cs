@@ -28,7 +28,7 @@ public class ChangePlanCommandHandler : ICommandHandler<ChangePlanCommand>
     }
 
     /// <inheritdoc/>
-    public async Task<Result> Handle(
+    public async Task<Result<Error>> Handle(
         ChangePlanCommand command,
         CancellationToken cancellationToken)
     {
@@ -37,7 +37,7 @@ public class ChangePlanCommandHandler : ICommandHandler<ChangePlanCommand>
             .ConfigureAwait(false);
 
         if (subscription is null)
-            return Result.Failure(
+            return Result<Error>.Failure(
                 Error.NotFound($"Подписка с ID '{command.SubscriptionId}' не найдена."));
 
         var plan = await _planRepository
@@ -45,11 +45,11 @@ public class ChangePlanCommandHandler : ICommandHandler<ChangePlanCommand>
             .ConfigureAwait(false);
 
         if (plan is null)
-            return Result.Failure(
+            return Result<Error>.Failure(
                 Error.NotFound($"План с ID '{command.NewPlanId}' не найден."));
 
         if (!plan.IsActive)
-            return Result.Failure(
+            return Result<Error>.Failure(
                 Error.Conflict("Нельзя сменить на неактивный план."));
 
         subscription.ChangePlan(
@@ -64,6 +64,6 @@ public class ChangePlanCommandHandler : ICommandHandler<ChangePlanCommand>
             .SaveChangesAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        return Result.Success();
+        return Result<Error>.Success();
     }
 }
