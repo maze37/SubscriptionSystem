@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using SubscriptionService.Application.DTOs;
 using SubscriptionService.Application.UseCases.Plans.Commands.CreatePlan;
 using SubscriptionService.Application.UseCases.Plans.Queries.GetActivePlans;
+using SubscriptionService.Web.Contracts;
 using SubscriptionService.Web.Extensions;
 
 namespace SubscriptionService.Web.Controllers;
@@ -20,7 +21,7 @@ public sealed class PlansController : ControllerBase
 
     /// <summary>Создать тарифный план.</summary>
     [HttpPost]
-    [ProducesResponseType(typeof(Guid), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(EndpointEnvelope<Guid>), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create(
         [FromBody] CreatePlanRequest request,
@@ -34,12 +35,12 @@ public sealed class PlansController : ControllerBase
         var result = await _sender.Send(command, cancellationToken)
             .ConfigureAwait(false);
 
-        return this.FromResult(result, nameof(GetActive), new { id = result.Value });
+        return this.FromResult(result, StatusCodes.Status201Created);
     }
 
     /// <summary>Получить все активные планы.</summary>
     [HttpGet("active")]
-    [ProducesResponseType(typeof(IReadOnlyList<PlanResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(EndpointEnvelope<IReadOnlyList<PlanResponse>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetActive(CancellationToken cancellationToken = default)
     {
         var result = await _sender.Send(new GetActivePlansQuery(), cancellationToken)

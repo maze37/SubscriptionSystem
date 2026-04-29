@@ -1,6 +1,6 @@
 using SharedKernel.Base;
 using SharedKernel.Constants;
-using SharedKernel.Exceptions;
+using SharedKernel.Result;
 using SubscriptionService.Domain.Enums;
 using SubscriptionService.Domain.ValueObjects;
 
@@ -43,57 +43,61 @@ public class Invoice : Entity
     }
 
     /// <summary>Создать новый счёт на оплату.</summary>
-    public static Invoice Create(
+    public static Result<Invoice, Error> Create(
         Guid invoiceId,
         Money amount,
         DateTimeOffset dueDate,
         DateTimeOffset createdWhen)
     {
         if (invoiceId == Guid.Empty)
-            throw new DomainException(
+            return Result<Invoice, Error>.Failure(Error.Validation(
                 DomainErrors.Invoice.InvalidId,
                 "ID счёта не может быть пустым.",
-                nameof(invoiceId));
+                nameof(invoiceId)));
 
         var moneyResult = Money.Create(amount);
+        if (moneyResult.IsFailure)
+            return Result<Invoice, Error>.Failure(moneyResult.Error!);
 
-        return new Invoice(
+        return Result<Invoice, Error>.Success(new Invoice(
             invoiceId,
-            moneyResult, 
+            moneyResult.Value!,
             dueDate, 
-            createdWhen);
+            createdWhen));
     }
 
     /// <summary>Отметить счёт как оплаченный.</summary>
-    public void MarkAsPaid(DateTimeOffset paidWhen)
+    public Result<Error> MarkAsPaid(DateTimeOffset paidWhen)
     {
         if (Status == InvoiceStatus.Paid)
-            throw new DomainException(
+            return Result<Error>.Failure(Error.Conflict(
                 DomainErrors.Invoice.AlreadyPaid,
-                "Счёт уже оплачен.");
+                "Счёт уже оплачен."));
 
         if (Status == InvoiceStatus.Failed)
-            throw new DomainException(
+            return Result<Error>.Failure(Error.Conflict(
                 DomainErrors.Invoice.AlreadyFailed,
-                "Нельзя оплатить отклонённый счёт.");
+                "Нельзя оплатить отклонённый счёт."));
 
         Status = InvoiceStatus.Paid;
         PaidWhen = paidWhen;
+        return Result<Error>.Success();
     }
 
     /// <summary>Отметить счёт как неоплаченный (платёж отклонён).</summary>
-    public void MarkAsFailed()
+    public Result<Error> MarkAsFailed()
     {
         if (Status == InvoiceStatus.Paid)
-            throw new DomainException(
+            return Result<Error>.Failure(Error.Conflict(
                 DomainErrors.Invoice.AlreadyPaid,
-                "Нельзя отклонить уже оплаченный счёт.");
+                "Нельзя отклонить уже оплаченный счёт."));
 
         if (Status == InvoiceStatus.Failed)
-            throw new DomainException(
+            return Result<Error>.Failure(Error.Conflict(
                 DomainErrors.Invoice.AlreadyFailed,
-                "Счёт уже отклонён.");
+                "Счёт уже отклонён."));
 
         Status = InvoiceStatus.Failed;
+        return Result<Error>.Success();
     }
 }

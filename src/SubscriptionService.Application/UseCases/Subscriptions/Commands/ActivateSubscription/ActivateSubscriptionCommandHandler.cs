@@ -8,7 +8,7 @@ namespace SubscriptionService.Application.UseCases.Subscriptions.Commands.Activa
 /// Обработчик команды ActivateSubscriptionCommand.
 /// Находит подписку, отмечает счёт как оплаченный, активирует подписку.
 /// </summary>
-public class ActivateSubscriptionCommandHandler : ICommandHandler<ActivateSubscriptionCommand>
+public class ActivateSubscriptionCommandHandler : ICommandHandler<ActivateSubscriptionCommand, ActivateSubscriptionResponse>
 {
     private readonly ISubscriptionRepository _subscriptionRepository;
     private readonly IPlanRepository _planRepository;
@@ -28,7 +28,7 @@ public class ActivateSubscriptionCommandHandler : ICommandHandler<ActivateSubscr
     }
 
     /// <inheritdoc/>
-    public async Task<Result<Error>> Handle(
+    public async Task<Result<ActivateSubscriptionResponse, Error>> Handle(
         ActivateSubscriptionCommand command,
         CancellationToken cancellationToken)
     {
@@ -37,25 +37,30 @@ public class ActivateSubscriptionCommandHandler : ICommandHandler<ActivateSubscr
             .ConfigureAwait(false);
 
         if (subscription is null)
-            return Result<Error>.Failure(
-                Error.NotFound($"Подписка с ID '{command.SubscriptionId}' не найдена."));
+            return Result<ActivateSubscriptionResponse, Error>.Failure(
+                Error.NotFound("subscription.not_found", $"Подписка с ID '{command.SubscriptionId}' не найдена."));
 
         var plan = await _planRepository
             .GetByIdAsync(subscription.PlanId, cancellationToken)
             .ConfigureAwait(false);
 
         if (plan is null)
-            return Result<Error>.Failure(
-                Error.NotFound($"План с ID '{subscription.PlanId}' не найден."));
+            return Result<ActivateSubscriptionResponse, Error>.Failure(
+                Error.NotFound("plan.not_found", $"План с ID '{subscription.PlanId}' не найден."));
 
-        subscription.Activate(command.InvoiceId, plan.BillingPeriod, _dateTime.UtcNow);
+        var activateResult = subscription.Activate(command.InvoiceId, plan.BillingPeriod, _dateTime.UtcNow);
+        if (activateResult.IsFailure)
+            return Result<ActivateSubscriptionResponse, Error>.Failure(activateResult.Error!);
 
         _subscriptionRepository.Update(subscription);
 
-        await _unitOfWork
+        var saveResult = await _unitOfWork
             .SaveChangesAsync(cancellationToken)
             .ConfigureAwait(false);
+        if (saveResult.IsFailure)
+            return Result<ActivateSubscriptionResponse, Error>.Failure(saveResult.Error!);
 
-        return Result<Error>.Success();
+        return Result<ActivateSubscriptionResponse, Error>.Success(
+            new ActivateSubscriptionResponse(subscription.Id, command.InvoiceId));
     }
 }

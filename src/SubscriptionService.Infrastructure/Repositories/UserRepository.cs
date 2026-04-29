@@ -28,8 +28,10 @@ public class UserRepository : IUserRepository
     /// <inheritdoc/>
     public async Task<bool> ExistsByEmailAsync(string email, CancellationToken ct = default)
     {
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+
         return await _context.Users
-            .AnyAsync(u => u.Email.Value == email, ct)
+            .AnyAsync(u => u.Email.Value == normalizedEmail, ct)
             .ConfigureAwait(false);
     }
 

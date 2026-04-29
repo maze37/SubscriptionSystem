@@ -1,6 +1,6 @@
 using SharedKernel.Base;
 using SharedKernel.Constants;
-using SharedKernel.Exceptions;
+using SharedKernel.Result;
 using SubscriptionService.Domain.Enums;
 using SubscriptionService.Domain.ValueObjects;
 
@@ -67,17 +67,17 @@ public class Subscription : AggregateRoot
         CreatedWhen = createdWhen;
     }
 
-    private static DateTimeOffset CalculatePeriodEnd(
+    private static Result<DateTimeOffset, Error> CalculatePeriodEnd(
         DateTimeOffset startedWhen,
         BillingPeriod billingPeriod) =>
         billingPeriod switch
         {
-            BillingPeriod.Monthly => startedWhen.AddMonths(1),
-            BillingPeriod.Yearly => startedWhen.AddYears(1),
-            _ => throw new DomainException(
+            BillingPeriod.Monthly => Result<DateTimeOffset, Error>.Success(startedWhen.AddMonths(1)),
+            BillingPeriod.Yearly => Result<DateTimeOffset, Error>.Success(startedWhen.AddYears(1)),
+            _ => Result<DateTimeOffset, Error>.Failure(Error.Validation(
                 DomainErrors.Plan.InvalidBillingPeriod,
                 $"Неподдерживаемый billing period '{billingPeriod}'.",
-                nameof(billingPeriod))
+                nameof(billingPeriod)))
         };
 
     /// <summary>
@@ -85,7 +85,7 @@ public class Subscription : AggregateRoot
     /// Если withTrial = true — подписка начинается с триального периода (14 дней).
     /// Если withTrial = false — сразу создаётся счёт на оплату.
     /// </summary>
-    public static Subscription Create(
+    public static Result<Subscription, Error> Create(
         Guid id,
         Guid userId,
         Guid planId,
@@ -96,49 +96,53 @@ public class Subscription : AggregateRoot
         DateTimeOffset createdWhen)
     {
         if (id == Guid.Empty)
-            throw new DomainException(
+            return Result<Subscription, Error>.Failure(Error.Validation(
                 DomainErrors.Subscription.InvalidId,
                 "ID подписки не может быть пустым.",
-                nameof(id));
+                nameof(id)));
 
         if (userId == Guid.Empty)
-            throw new DomainException(
+            return Result<Subscription, Error>.Failure(Error.Validation(
                 DomainErrors.Subscription.InvalidUserId,
                 "ID пользователя не может быть пустым.",
-                nameof(userId));
+                nameof(userId)));
 
         if (planId == Guid.Empty)
-            throw new DomainException(
+            return Result<Subscription, Error>.Failure(Error.Validation(
                 DomainErrors.Subscription.InvalidPlanId,
                 "ID плана не может быть пустым.",
-                nameof(planId));
+                nameof(planId)));
         
         if (withTrial)
         {
             var trialEnd = createdWhen.AddDays(TrialDurationDays);
 
-            return new Subscription(
+            return Result<Subscription, Error>.Success(new Subscription(
                 id,
                 userId,
                 planId,
                 SubscriptionStatus.Trial,
                 currentPeriodEnd: trialEnd,
                 createdWhen: createdWhen,
-                trialEnd: trialEnd);
+                trialEnd: trialEnd));
         }
         
         if (invoiceId == Guid.Empty)
-            throw new DomainException(
+            return Result<Subscription, Error>.Failure(Error.Validation(
                 DomainErrors.Invoice.InvalidId,
                 "ID счета не может быть пустым.",
-                nameof(invoiceId));
+                nameof(invoiceId)));
+
+        var periodEndResult = CalculatePeriodEnd(createdWhen, billingPeriod);
+        if (periodEndResult.IsFailure)
+            return Result<Subscription, Error>.Failure(periodEndResult.Error!);
 
         var subscription = new Subscription(
             id,
             userId,
             planId,
             SubscriptionStatus.Active,
-            currentPeriodEnd: CalculatePeriodEnd(createdWhen, billingPeriod),
+            currentPeriodEnd: periodEndResult.Value!,
             createdWhen: createdWhen);
 
         var invoice = Invoice.Create(
@@ -147,36 +151,40 @@ public class Subscription : AggregateRoot
             dueDate: createdWhen.AddDays(3),
             createdWhen: createdWhen);
 
-        subscription._invoices.Add(invoice);
+        if (invoice.IsFailure)
+            return Result<Subscription, Error>.Failure(invoice.Error!);
 
-        return subscription;
+        subscription._invoices.Add(invoice.Value!);
+
+        return Result<Subscription, Error>.Success(subscription);
     }
 
     /// <summary>
     /// Отменить подписку.
     /// Доступ сохраняется до конца текущего периода.
     /// </summary>
-    public void Cancel(DateTimeOffset cancelledWhen)
+    public Result<Error> Cancel(DateTimeOffset cancelledWhen)
     {
         if (Status == SubscriptionStatus.Cancelled)
-            throw new DomainException(
+            return Result<Error>.Failure(Error.Conflict(
                 DomainErrors.Subscription.AlreadyCancelled,
-                "Подписка уже отменена.");
+                "Подписка уже отменена."));
 
         if (Status == SubscriptionStatus.Expired)
-            throw new DomainException(
+            return Result<Error>.Failure(Error.Conflict(
                 DomainErrors.Subscription.AlreadyExpired,
-                "Нельзя отменить истекшую подписку.");
+                "Нельзя отменить истекшую подписку."));
 
         CancelledWhen = cancelledWhen;
         CancelAtPeriodEnd = true;
+        return Result<Error>.Success();
     }
 
     /// <summary>
     /// Сменить тарифный план.
     /// Создаётся новый счёт на оплату по цене нового плана.
     /// </summary>
-    public void ChangePlan(
+    public Result<Error> ChangePlan(
         Guid invoiceId,
         Guid newPlanId,
         Money newPrice,
@@ -184,21 +192,21 @@ public class Subscription : AggregateRoot
     {
         if (Status != SubscriptionStatus.Active &&
             Status != SubscriptionStatus.Trial)
-            throw new DomainException(
+            return Result<Error>.Failure(Error.Conflict(
                 DomainErrors.Subscription.CannotChangePlan,
-                "Нельзя сменить план неактивной подписки.");
+                "Нельзя сменить план неактивной подписки."));
         
         if (newPlanId == Guid.Empty)
-            throw new DomainException(
+            return Result<Error>.Failure(Error.Validation(
                 DomainErrors.Subscription.InvalidPlanId,
                 "ID нового плана не может быть пустым.",
-                nameof(newPlanId));
+                nameof(newPlanId)));
         
         if (invoiceId == Guid.Empty)
-            throw new DomainException(
+            return Result<Error>.Failure(Error.Validation(
                 DomainErrors.Invoice.InvalidId,
                 "ID счета не может быть пустым.",
-                nameof(invoiceId));
+                nameof(invoiceId)));
 
         PlanId = newPlanId;
 
@@ -208,7 +216,11 @@ public class Subscription : AggregateRoot
             dueDate: changedWhen.AddDays(3),
             createdWhen: changedWhen);
 
-        _invoices.Add(invoice);
+        if (invoice.IsFailure)
+            return Result<Error>.Failure(invoice.Error!);
+
+        _invoices.Add(invoice.Value!);
+        return Result<Error>.Success();
     }
 
     /// <summary>
@@ -216,30 +228,33 @@ public class Subscription : AggregateRoot
     /// Вызывается фоновым сервисом когда заканчивается CurrentPeriodEnd.
     /// Если CancelAtPeriodEnd = true — подписка переходит в Cancelled.
     /// </summary>
-    public void Renew(
+    public Result<Error> Renew(
         Guid invoiceId,
         Money price,
         BillingPeriod billingPeriod,
         DateTimeOffset renewedWhen)
     {
         if (CancelAtPeriodEnd)
-        {
-            Status = SubscriptionStatus.Cancelled;
-            return;
-        }
+            return Result<Error>.Failure(Error.Conflict(
+                DomainErrors.Subscription.CannotRenew,
+                "Подписка запланирована к отмене в конце периода и не может быть продлена."));
 
         if (Status != SubscriptionStatus.Active)
-            throw new DomainException(
+            return Result<Error>.Failure(Error.Conflict(
                 DomainErrors.Subscription.CannotRenew,
-                "Нельзя продлить неактивную подписку.");
+                "Нельзя продлить неактивную подписку."));
         
         if (invoiceId == Guid.Empty)
-            throw new DomainException(
+            return Result<Error>.Failure(Error.Validation(
                 DomainErrors.Invoice.InvalidId,
                 "ID счёта не может быть пустым.",
-                nameof(invoiceId));
+                nameof(invoiceId)));
         
-        CurrentPeriodEnd = CalculatePeriodEnd(renewedWhen, billingPeriod);
+        var periodEndResult = CalculatePeriodEnd(renewedWhen, billingPeriod);
+        if (periodEndResult.IsFailure)
+            return Result<Error>.Failure(periodEndResult.Error!);
+
+        CurrentPeriodEnd = periodEndResult.Value!;
         
         var invoice = Invoice.Create(
             invoiceId,
@@ -247,13 +262,17 @@ public class Subscription : AggregateRoot
             dueDate: renewedWhen.AddDays(3),
             createdWhen: renewedWhen);
 
-        _invoices.Add(invoice);
+        if (invoice.IsFailure)
+            return Result<Error>.Failure(invoice.Error!);
+
+        _invoices.Add(invoice.Value!);
+        return Result<Error>.Success();
     }
 
     /// <summary>
     /// Активировать подписку после оплаты счёта.
     /// </summary>
-    public void Activate(
+    public Result<Error> Activate(
         Guid invoiceId,
         BillingPeriod billingPeriod,
         DateTimeOffset activatedWhen)
@@ -261,27 +280,35 @@ public class Subscription : AggregateRoot
         var invoice = _invoices.FirstOrDefault(i => i.Id == invoiceId);
 
         if (invoice is null)
-            throw new DomainException(
+            return Result<Error>.Failure(Error.NotFound(
                 DomainErrors.Invoice.NotFound,
-                $"Счёт с ID '{invoiceId}' не найден.");
+                $"Счёт с ID '{invoiceId}' не найден."));
 
-        invoice.MarkAsPaid(activatedWhen);
+        var invoicePaymentResult = invoice.MarkAsPaid(activatedWhen);
+        if (invoicePaymentResult.IsFailure)
+            return invoicePaymentResult;
+
+        var periodEndResult = CalculatePeriodEnd(activatedWhen, billingPeriod);
+        if (periodEndResult.IsFailure)
+            return Result<Error>.Failure(periodEndResult.Error!);
 
         Status = SubscriptionStatus.Active;
-        CurrentPeriodEnd = CalculatePeriodEnd(activatedWhen, billingPeriod);
+        CurrentPeriodEnd = periodEndResult.Value!;
+        return Result<Error>.Success();
     }
 
     /// <summary>
     /// Истечь подписку — вызывается если счёт не оплачен вовремя.
     /// </summary>
-    public void Expire(DateTimeOffset expiredWhen)
+    public Result<Error> Expire(DateTimeOffset expiredWhen)
     {
         if (Status == SubscriptionStatus.Expired)
-            throw new DomainException(
+            return Result<Error>.Failure(Error.Conflict(
                 DomainErrors.Subscription.AlreadyExpired,
-                "Подписка уже истекла.");
+                "Подписка уже истекла."));
 
         ExpiredWhen = expiredWhen;
         Status = SubscriptionStatus.Expired;
+        return Result<Error>.Success();
     }
 }

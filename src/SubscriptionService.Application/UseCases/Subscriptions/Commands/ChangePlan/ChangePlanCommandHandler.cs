@@ -8,7 +8,7 @@ namespace SubscriptionService.Application.UseCases.Subscriptions.Commands.Change
 /// Обработчик команды ChangePlanCommand.
 /// Проверяет план, меняет PlanId и создаёт новый счёт на оплату.
 /// </summary>
-public class ChangePlanCommandHandler : ICommandHandler<ChangePlanCommand>
+public class ChangePlanCommandHandler : ICommandHandler<ChangePlanCommand, ChangePlanResponse>
 {
     private readonly ISubscriptionRepository _subscriptionRepository;
     private readonly IPlanRepository _planRepository;
@@ -28,7 +28,7 @@ public class ChangePlanCommandHandler : ICommandHandler<ChangePlanCommand>
     }
 
     /// <inheritdoc/>
-    public async Task<Result<Error>> Handle(
+    public async Task<Result<ChangePlanResponse, Error>> Handle(
         ChangePlanCommand command,
         CancellationToken cancellationToken)
     {
@@ -37,33 +37,38 @@ public class ChangePlanCommandHandler : ICommandHandler<ChangePlanCommand>
             .ConfigureAwait(false);
 
         if (subscription is null)
-            return Result<Error>.Failure(
-                Error.NotFound($"Подписка с ID '{command.SubscriptionId}' не найдена."));
+            return Result<ChangePlanResponse, Error>.Failure(
+                Error.NotFound("subscription.not_found", $"Подписка с ID '{command.SubscriptionId}' не найдена."));
 
         var plan = await _planRepository
             .GetByIdAsync(command.NewPlanId, cancellationToken)
             .ConfigureAwait(false);
 
         if (plan is null)
-            return Result<Error>.Failure(
-                Error.NotFound($"План с ID '{command.NewPlanId}' не найден."));
+            return Result<ChangePlanResponse, Error>.Failure(
+                Error.NotFound("plan.not_found", $"План с ID '{command.NewPlanId}' не найден."));
 
         if (!plan.IsActive)
-            return Result<Error>.Failure(
-                Error.Conflict("Нельзя сменить на неактивный план."));
+            return Result<ChangePlanResponse, Error>.Failure(
+                Error.Conflict("plan.inactive", "Нельзя сменить на неактивный план."));
 
-        subscription.ChangePlan(
+        var changeResult = subscription.ChangePlan(
             Guid.NewGuid(),
             command.NewPlanId,
             plan.Price,
             _dateTime.UtcNow);
+        if (changeResult.IsFailure)
+            return Result<ChangePlanResponse, Error>.Failure(changeResult.Error!);
 
         _subscriptionRepository.Update(subscription);
 
-        await _unitOfWork
+        var saveResult = await _unitOfWork
             .SaveChangesAsync(cancellationToken)
             .ConfigureAwait(false);
+        if (saveResult.IsFailure)
+            return Result<ChangePlanResponse, Error>.Failure(saveResult.Error!);
 
-        return Result<Error>.Success();
+        return Result<ChangePlanResponse, Error>.Success(
+            new ChangePlanResponse(subscription.Id, command.NewPlanId));
     }
 }

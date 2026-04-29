@@ -1,6 +1,6 @@
 using SharedKernel.Base;
 using SharedKernel.Constants;
-using SharedKernel.Exceptions;
+using SharedKernel.Result;
 
 namespace SubscriptionService.Domain.ValueObjects;
 
@@ -16,27 +16,22 @@ public class PlanName : ValueObject
     
     private PlanName(string value) => Value = value;
 
-    /// <summary>
-    /// Создать название плана с валидацией.
-    /// </summary>
-    /// <param name="value">Название плана.</param>
-    /// <exception cref="DomainException">Если название пустое или превышает максимальную длину.</exception>
-
-    public static PlanName Create(string value)
+    /// <summary>Создать название плана с валидацией.</summary>
+    public static Result<PlanName, Error> Create(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
-            throw new DomainException(
+            return Result<PlanName, Error>.Failure(Error.Validation(
                 DomainErrors.PlanName.Empty,
                 "Название плана не может быть пустым.",
-                nameof(value));
+                nameof(value)));
 
         if (value.Length > MaxLength)
-            throw new DomainException(
+            return Result<PlanName, Error>.Failure(Error.Validation(
                 DomainErrors.PlanName.TooLong,
                 "Название плана слишком длинное",
-                nameof(value));
+                nameof(value)));
 
-        return new PlanName(value);
+        return Result<PlanName, Error>.Success(new PlanName(value));
     }
     
     protected override IEnumerable<object> GetEqualityComponents()

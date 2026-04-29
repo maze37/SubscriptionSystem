@@ -58,6 +58,9 @@ public class SubscriptionRepository : ISubscriptionRepository
     public void Update(Subscription subscription)
     {
         ArgumentNullException.ThrowIfNull(subscription);
-        _context.Subscriptions.Update(subscription);
+
+        var entry = _context.Entry(subscription);
+        if (entry.State == EntityState.Detached)
+            _context.Subscriptions.Attach(subscription);
     }
 }

@@ -30,25 +30,31 @@ public class RegisterUserCommandHandler : ICommandHandler<RegisterUserCommand, G
         RegisterUserCommand command,
         CancellationToken cancellationToken)
     {
+        var normalizedEmail = command.Email.Trim().ToLowerInvariant();
+
         var emailExists = await _userRepository
-            .ExistsByEmailAsync(command.Email, cancellationToken)
+            .ExistsByEmailAsync(normalizedEmail, cancellationToken)
             .ConfigureAwait(false);
 
         if (emailExists)
             return Result<Guid, Error>.Failure(
-                Error.Conflict($"Пользователь с email '{command.Email}' уже существует."));
+                Error.Conflict("user.email.taken", $"Пользователь с email '{command.Email}' уже существует."));
 
         var user = User.Create(
             Guid.NewGuid(),
             command.Email,
             _dateTime.UtcNow);
+        if (user.IsFailure)
+            return Result<Guid, Error>.Failure(user.Error!);
 
-        _userRepository.Add(user);
+        _userRepository.Add(user.Value!);
 
-        await _unitOfWork
+        var saveResult = await _unitOfWork
             .SaveChangesAsync(cancellationToken)
             .ConfigureAwait(false);
+        if (saveResult.IsFailure)
+            return Result<Guid, Error>.Failure(saveResult.Error!);
 
-        return Result<Guid, Error>.Success(user.Id);
+        return Result<Guid, Error>.Success(user.Value!.Id);
     }
 }

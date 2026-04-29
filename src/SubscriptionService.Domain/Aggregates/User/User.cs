@@ -1,6 +1,6 @@
 using SharedKernel.Base;
 using SharedKernel.Constants;
-using SharedKernel.Exceptions;
+using SharedKernel.Result;
 using SubscriptionService.Domain.ValueObjects;
 
 namespace SubscriptionService.Domain.Aggregates.User;
@@ -34,34 +34,39 @@ public class User : AggregateRoot
     }
 
     /// <summary>Зарегистрировать нового пользователя.</summary>
-    public static User Create(
+    public static Result<User, Error> Create(
         Guid userId,
         string email,
         DateTimeOffset createdWhen)
     {
         if (userId == Guid.Empty)
-            throw new DomainException(
+            return Result<User, Error>.Failure(Error.Validation(
                 DomainErrors.User.InvalidId,
                 "ID пользователя не может быть пустым.",
-                nameof(userId));
+                nameof(userId)));
 
-        return new User(
+        var emailResult = UserEmail.Create(email);
+        if (emailResult.IsFailure)
+            return Result<User, Error>.Failure(emailResult.Error!);
+
+        return Result<User, Error>.Success(new User(
             userId,
-            UserEmail.Create(email),
-            createdWhen);
+            emailResult.Value!,
+            createdWhen));
     }
 
     /// <summary>
     /// Отметить что пользователь использовал триал.
     /// Триальный период можно использовать только один раз.
     /// </summary>
-    public void MarkTrialUsed()
+    public Result<Error> MarkTrialUsed()
     {
         if (HasUsedTrial)
-            throw new DomainException(
+            return Result<Error>.Failure(Error.Conflict(
                 DomainErrors.User.TrialAlreadyUsed,
-                "Триальный период уже был использован.");
+                "Триальный период уже был использован."));
 
         HasUsedTrial = true;
+        return Result<Error>.Success();
     }
 }

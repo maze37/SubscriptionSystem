@@ -21,6 +21,13 @@ public class Error
         InvalidField = invalidField;
     }
 
+    public static Error Create(
+        string errorCode,
+        string errorMessage,
+        ErrorType type,
+        string? invalidField = null) =>
+        new(errorCode, errorMessage, type, invalidField);
+
     public string Serialize()
     {
         return string.Join(separator, ErrorCode, ErrorMessage, Type);
@@ -48,18 +55,33 @@ public class Error
 #pragma warning disable CA1305
     public static Error Validation(string errorMessage, string? invalidField = null) =>
         new(ErrorCodes.ValidationError.ToString(), errorMessage, ErrorType.Validation, invalidField);
+
+    public static Error Validation(string errorCode, string errorMessage, string? invalidField = null) =>
+        new(errorCode, errorMessage, ErrorType.Validation, invalidField);
     
     public static Error Failure(string errorMessage) =>
         new(ErrorCodes.InternalServerError.ToString(), errorMessage, ErrorType.Failure);
+
+    public static Error Failure(string errorCode, string errorMessage) =>
+        new(errorCode, errorMessage, ErrorType.Failure);
     
     public static Error NotFound(string errorMessage) =>
         new(ErrorCodes.NotFound.ToString(CultureInfo.InvariantCulture), errorMessage, ErrorType.NotFound);
+
+    public static Error NotFound(string errorCode, string errorMessage) =>
+        new(errorCode, errorMessage, ErrorType.NotFound);
     
     public static Error Forbidden(string errorMessage) =>
         new(ErrorCodes.Forbidden.ToString(CultureInfo.InvariantCulture), errorMessage, ErrorType.Forbidden);
 
+    public static Error Forbidden(string errorCode, string errorMessage) =>
+        new(errorCode, errorMessage, ErrorType.Forbidden);
+
     public static Error Conflict(string errorMessage) =>
         new(ErrorCodes.Conflict.ToString(), errorMessage, ErrorType.Conflict);
+
+    public static Error Conflict(string errorCode, string errorMessage) =>
+        new(errorCode, errorMessage, ErrorType.Conflict);
     
     public static Error Null(string errorMessage, string? invalidField = null) =>
         new(ErrorCodes.BadRequest.ToString(CultureInfo.InvariantCulture), errorMessage, ErrorType.Null, invalidField);

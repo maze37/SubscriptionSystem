@@ -56,6 +56,7 @@ public class SubscriptionConfiguration : IEntityTypeConfiguration<Subscription>
 
             invoiceBuilder.HasKey(i => i.Id);
             invoiceBuilder.Property(i => i.Id)
+                .ValueGeneratedNever()
                 .HasColumnName("id");
 
             invoiceBuilder.OwnsOne(i => i.Amount, amountBuilder =>

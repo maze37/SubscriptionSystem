@@ -37,13 +37,17 @@ public class CreatePlanCommandHandler : ICommandHandler<CreatePlanCommand, Guid>
             command.Price,
             command.BillingPeriod,
             _dateTime.UtcNow);
+        if (plan.IsFailure)
+            return Result<Guid, Error>.Failure(plan.Error!);
 
-        _planRepository.Add(plan);
+        _planRepository.Add(plan.Value!);
 
-        await _unitOfWork
+        var saveResult = await _unitOfWork
             .SaveChangesAsync(cancellationToken)
             .ConfigureAwait(false);
+        if (saveResult.IsFailure)
+            return Result<Guid, Error>.Failure(saveResult.Error!);
 
-        return Result<Guid, Error>.Success(plan.Id);
+        return Result<Guid, Error>.Success(plan.Value!.Id);
     }
 }

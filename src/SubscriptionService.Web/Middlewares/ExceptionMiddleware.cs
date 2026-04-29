@@ -1,6 +1,5 @@
 using System.Net;
 using System.Text.Json;
-using SharedKernel.Exceptions;
 using SharedKernel.Result;
 using SubscriptionService.Web.Contracts;
 
@@ -33,34 +32,12 @@ public sealed class ExceptionMiddleware
         {
             await _next(context).ConfigureAwait(false);
         }
-        catch (DomainException ex)
-        {
-            // Доменные ошибки — ожидаемые бизнес-нарушения, логируем как Warning
-            _logger.LogWarning(ex, "Domain exception: {Code} - {Message}", ex.Code, ex.Message);
-            await HandleDomainExceptionAsync(context, ex).ConfigureAwait(false);
-        }
         catch (Exception ex)
         {
             // Всё остальное — непредвиденная ошибка, логируем как Error
             _logger.LogError(ex, "Unhandled exception");
             await HandleUnhandledExceptionAsync(context).ConfigureAwait(false);
         }
-    }
-
-    /// <summary>
-    /// Возвращает 400 Bad Request с деталями доменной ошибки.
-    /// </summary>
-    private static async Task HandleDomainExceptionAsync(HttpContext context, DomainException ex)
-    {
-        context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
-        context.Response.ContentType = "application/json";
-
-        var error = Error.Validation(ex.Message, ex.Field);
-        var response = EndpointResult.Failure(error, context);
-
-        await context.Response.WriteAsync(
-            JsonSerializer.Serialize(response, JsonOptions))
-            .ConfigureAwait(false);
     }
 
     /// <summary>

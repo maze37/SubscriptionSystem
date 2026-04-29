@@ -8,7 +8,7 @@ namespace SubscriptionService.Application.UseCases.Subscriptions.Commands.Cancel
 /// Обработчик команды CancelSubscriptionCommand.
 /// Находит подписку и устанавливает CancelAtPeriodEnd = true.
 /// </summary>
-public class CancelSubscriptionCommandHandler : ICommandHandler<CancelSubscriptionCommand>
+public class CancelSubscriptionCommandHandler : ICommandHandler<CancelSubscriptionCommand, CancelSubscriptionResponse>
 {
     private readonly ISubscriptionRepository _subscriptionRepository;
     private readonly IUnitOfWork _unitOfWork;
@@ -25,7 +25,7 @@ public class CancelSubscriptionCommandHandler : ICommandHandler<CancelSubscripti
     }
 
     /// <inheritdoc/>
-    public async Task<Result<Error>> Handle(
+    public async Task<Result<CancelSubscriptionResponse, Error>> Handle(
         CancelSubscriptionCommand command,
         CancellationToken cancellationToken)
     {
@@ -34,17 +34,22 @@ public class CancelSubscriptionCommandHandler : ICommandHandler<CancelSubscripti
             .ConfigureAwait(false);
 
         if (subscription is null)
-            return Result<Error>.Failure(
-                Error.NotFound($"Подписка с ID '{command.SubscriptionId}' не найдена."));
+            return Result<CancelSubscriptionResponse, Error>.Failure(
+                Error.NotFound("subscription.not_found", $"Подписка с ID '{command.SubscriptionId}' не найдена."));
 
-        subscription.Cancel(_dateTime.UtcNow);
+        var cancelResult = subscription.Cancel(_dateTime.UtcNow);
+        if (cancelResult.IsFailure)
+            return Result<CancelSubscriptionResponse, Error>.Failure(cancelResult.Error!);
 
         _subscriptionRepository.Update(subscription);
 
-        await _unitOfWork
+        var saveResult = await _unitOfWork
             .SaveChangesAsync(cancellationToken)
             .ConfigureAwait(false);
+        if (saveResult.IsFailure)
+            return Result<CancelSubscriptionResponse, Error>.Failure(saveResult.Error!);
 
-        return Result<Error>.Success();
+        return Result<CancelSubscriptionResponse, Error>.Success(
+            new CancelSubscriptionResponse(subscription.Id));
     }
 }

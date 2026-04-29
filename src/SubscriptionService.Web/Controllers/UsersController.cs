@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using SubscriptionService.Application.DTOs;
 using SubscriptionService.Application.UseCases.Users.Commands.RegisterUser;
+using SubscriptionService.Web.Contracts;
 using SubscriptionService.Web.Extensions;
 
 namespace SubscriptionService.Web.Controllers;
@@ -19,7 +20,7 @@ public sealed class UsersController : ControllerBase
 
     /// <summary>Зарегистрировать нового пользователя.</summary>
     [HttpPost]
-    [ProducesResponseType(typeof(Guid), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(EndpointEnvelope<Guid>), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Register(
@@ -31,6 +32,6 @@ public sealed class UsersController : ControllerBase
         var result = await _sender.Send(command, cancellationToken)
             .ConfigureAwait(false);
 
-        return this.FromResult(result, nameof(Register), new { id = result.Value });
+        return this.FromResult(result, StatusCodes.Status201Created);
     }
 }

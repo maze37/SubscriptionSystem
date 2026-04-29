@@ -43,11 +43,11 @@ public class CreateSubscriptionCommandHandler : ICommandHandler<CreateSubscripti
 
         if (user is null)
             return Result<Guid, Error>.Failure(
-                Error.NotFound($"Пользователь с ID '{command.UserId}' не найден."));
+                Error.NotFound("user.not_found", $"Пользователь с ID '{command.UserId}' не найден."));
 
         if (command.WithTrial && user.HasUsedTrial)
             return Result<Guid, Error>.Failure(
-                Error.Conflict("Триальный период уже был использован."));
+                Error.Conflict("user.trial_already_used", "Триальный период уже был использован."));
 
         var hasActive = await _subscriptionRepository
             .HasActiveSubscriptionAsync(command.UserId, cancellationToken)
@@ -55,7 +55,7 @@ public class CreateSubscriptionCommandHandler : ICommandHandler<CreateSubscripti
 
         if (hasActive)
             return Result<Guid, Error>.Failure(
-                Error.Conflict("У пользователя уже есть активная подписка."));
+                Error.Conflict("subscription.active_exists", "У пользователя уже есть активная подписка."));
 
         var plan = await _planRepository
             .GetByIdAsync(command.PlanId, cancellationToken)
@@ -63,14 +63,18 @@ public class CreateSubscriptionCommandHandler : ICommandHandler<CreateSubscripti
 
         if (plan is null)
             return Result<Guid, Error>.Failure(
-                Error.NotFound($"План с ID '{command.PlanId}' не найден."));
+                Error.NotFound("plan.not_found", $"План с ID '{command.PlanId}' не найден."));
 
         if (!plan.IsActive)
             return Result<Guid, Error>.Failure(
-                Error.Conflict("Нельзя подписаться на неактивный план."));
+                Error.Conflict("plan.inactive", "Нельзя подписаться на неактивный план."));
 
         if (command.WithTrial)
-            user.MarkTrialUsed();
+        {
+            var markTrialResult = user.MarkTrialUsed();
+            if (markTrialResult.IsFailure)
+                return Result<Guid, Error>.Failure(markTrialResult.Error!);
+        }
 
         var subscription = Subscription.Create(
             Guid.NewGuid(),
@@ -81,13 +85,17 @@ public class CreateSubscriptionCommandHandler : ICommandHandler<CreateSubscripti
             plan.BillingPeriod,
             command.WithTrial,
             _dateTime.UtcNow);
+        if (subscription.IsFailure)
+            return Result<Guid, Error>.Failure(subscription.Error!);
 
-        _subscriptionRepository.Add(subscription);
+        _subscriptionRepository.Add(subscription.Value!);
 
-        await _unitOfWork
+        var saveResult = await _unitOfWork
             .SaveChangesAsync(cancellationToken)
             .ConfigureAwait(false);
+        if (saveResult.IsFailure)
+            return Result<Guid, Error>.Failure(saveResult.Error!);
 
-        return Result<Guid, Error>.Success(subscription.Id);
+        return Result<Guid, Error>.Success(subscription.Value!.Id);
     }
 }

@@ -6,6 +6,7 @@ using SubscriptionService.Application.UseCases.Subscriptions.Commands.CancelSubs
 using SubscriptionService.Application.UseCases.Subscriptions.Commands.ChangePlan;
 using SubscriptionService.Application.UseCases.Subscriptions.Commands.CreateSubscription;
 using SubscriptionService.Application.UseCases.Subscriptions.Queries.GetSubscription;
+using SubscriptionService.Web.Contracts;
 using SubscriptionService.Web.Extensions;
 
 namespace SubscriptionService.Web.Controllers;
@@ -39,7 +40,11 @@ public sealed class SubscriptionsController : ControllerBase
         var result = await _sender.Send(command, cancellationToken)
             .ConfigureAwait(false);
 
-        return this.FromResult(result, nameof(GetById), new { id = result.Value });
+        return this.FromResult(
+            result,
+            StatusCodes.Status201Created,
+            nameof(GetById),
+            new { id = result.Value });
     }
 
     /// <summary>Получить подписку по ID.</summary>
@@ -58,7 +63,7 @@ public sealed class SubscriptionsController : ControllerBase
 
     /// <summary>Отменить подписку.</summary>
     [HttpPost("{id:guid}/cancel")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(EndpointEnvelope<CancelSubscriptionResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Cancel(
@@ -75,7 +80,7 @@ public sealed class SubscriptionsController : ControllerBase
 
     /// <summary>Сменить тарифный план.</summary>
     [HttpPost("{id:guid}/change-plan")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(EndpointEnvelope<ChangePlanResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> ChangePlan(
@@ -93,7 +98,7 @@ public sealed class SubscriptionsController : ControllerBase
 
     /// <summary>Активировать подписку после оплаты счёта.</summary>
     [HttpPost("{id:guid}/activate")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(EndpointEnvelope<ActivateSubscriptionResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Activate(
         Guid id,

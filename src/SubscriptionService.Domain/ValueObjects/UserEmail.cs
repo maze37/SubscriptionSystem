@@ -1,6 +1,6 @@
 using SharedKernel.Base;
 using SharedKernel.Constants;
-using SharedKernel.Exceptions;
+using SharedKernel.Result;
 using System.Text.RegularExpressions;
 
 namespace SubscriptionService.Domain.ValueObjects;
@@ -23,27 +23,22 @@ public class UserEmail : ValueObject
 
     private UserEmail(string value) => Value = value;
 
-    /// <summary>
-    /// Создать email с валидацией формата.
-    /// </summary>
-    /// <param name="value">Строка email.</param>
-    /// <exception cref="DomainException">Если email пустой или некорректного формата.</exception>
-
-    public static UserEmail Create(string value)
+    /// <summary>Создать email с валидацией формата.</summary>
+    public static Result<UserEmail, Error> Create(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
-            throw new DomainException(
+            return Result<UserEmail, Error>.Failure(Error.Validation(
                 DomainErrors.UserEmail.Empty,
                 "Email не может быть пустым.",
-                nameof(value));
+                nameof(value)));
 
         if (!EmailRegex.IsMatch(value))
-            throw new DomainException(
+            return Result<UserEmail, Error>.Failure(Error.Validation(
                 DomainErrors.UserEmail.Invalid,
                 "Некорректный формат email.",
-                nameof(value));
+                nameof(value)));
 
-        return new UserEmail(value.Trim().ToLowerInvariant());
+        return Result<UserEmail, Error>.Success(new UserEmail(value.Trim().ToLowerInvariant()));
     }
 
     protected override IEnumerable<object> GetEqualityComponents()

@@ -1,15 +1,45 @@
 ﻿services:
   postgres:
-    image: postgres:18-alpine
     container_name: postgres
+    image: postgres:18-alpine
+    restart: always
     environment:
-      POSTGRES_DB: subscription_system
+      POSTGRES_DB: subscriptiondb
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: 1234
+      PGDATA: /var/lib/postgresql/pgdata
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql
+
+  seq:
+    container_name: seq
+    image: datalust/seq:latest
+    environment:
+      ACCEPT_EULA: "Y"
+      SEQ_FIRSTRUN_NOAUTHENTICATION: "true"
+    ports:
+      - "8081:80"
+      - "5341:5341"
+    restart: always
+
+  subscription-service:
+    build:
+      context: .
+      dockerfile: src/SubscriptionService.Web/Dockerfile
+    container_name: subscription-service
+    restart: always
+    ports:
+      - "5001:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__PostgreSQL: "Host=postgres;Port=5432;Database=subscriptiondb;Username=postgres;Password=1234"
+      Serilog__WriteTo__1__Args__serverUrl: "http://seq:80"
+    depends_on:
+      - postgres
+      - seq
 
 volumes:
-  postgres_data:
+  postgres-data:
+    name: subscriptionservice-postgres-data

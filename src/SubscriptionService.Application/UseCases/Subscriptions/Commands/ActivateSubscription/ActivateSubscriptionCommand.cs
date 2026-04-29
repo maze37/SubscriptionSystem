@@ -10,4 +10,6 @@ namespace SubscriptionService.Application.UseCases.Subscriptions.Commands.Activa
 /// <param name="InvoiceId">ID оплаченного счёта.</param>
 public record ActivateSubscriptionCommand(
     Guid SubscriptionId,
-    Guid InvoiceId) : ICommand;
+    Guid InvoiceId) : ICommand<ActivateSubscriptionResponse>;
+
+public record ActivateSubscriptionResponse(Guid SubscriptionId, Guid InvoiceId);

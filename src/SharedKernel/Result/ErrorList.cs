@@ -26,4 +26,6 @@ public class ErrorList : IEnumerable<Error>
     
     public static implicit operator ErrorList(Error error)
         => new([error]);
+
+    public IReadOnlyList<Error> AsReadOnly() => _errors.AsReadOnly();
 }

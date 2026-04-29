@@ -10,4 +10,6 @@ namespace SubscriptionService.Application.UseCases.Subscriptions.Commands.Change
 /// <param name="NewPlanId">ID нового плана.</param>
 public record ChangePlanCommand(
     Guid SubscriptionId,
-    Guid NewPlanId) : ICommand;
+    Guid NewPlanId) : ICommand<ChangePlanResponse>;
+
+public record ChangePlanResponse(Guid SubscriptionId, Guid NewPlanId);

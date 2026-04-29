@@ -1,4 +1,6 @@
+using Microsoft.EntityFrameworkCore;
 using SubscriptionService.Application.Abstractions;
+using SharedKernel.Result;
 
 namespace SubscriptionService.Infrastructure;
 
@@ -16,9 +18,27 @@ public class UnitOfWork : IUnitOfWork
     }
 
     /// <inheritdoc/>
-    public async Task SaveChangesAsync(CancellationToken ct = default)
+    public async Task<Result<Error>> SaveChangesAsync(CancellationToken ct = default)
     {
-        await _context.SaveChangesAsync(ct)
-            .ConfigureAwait(false);
+        try
+        {
+            await _context.SaveChangesAsync(ct)
+                .ConfigureAwait(false);
+            return Result<Error>.Success();
+        }
+        catch (DbUpdateException ex)
+        {
+            return Result<Error>.Failure(
+                Error.Conflict(
+                    "db.update.conflict",
+                    $"Конфликт сохранения данных: {ex.Message}"));
+        }
+        catch (Exception ex)
+        {
+            return Result<Error>.Failure(
+                Error.Failure(
+                    "db.save.failed",
+                    $"Ошибка сохранения данных: {ex.Message}"));
+        }
     }
 }

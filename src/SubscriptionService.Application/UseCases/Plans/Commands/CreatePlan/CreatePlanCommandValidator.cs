@@ -15,5 +15,8 @@ public class CreatePlanCommandValidator : AbstractValidator<CreatePlanCommand>
 
         RuleFor(x => x.Price)
             .GreaterThan(0).WithMessage("Цена должна быть больше нуля.");
+
+        RuleFor(x => x.BillingPeriod)
+            .IsInEnum().WithMessage("Некорректный billing period.");
     }
 }

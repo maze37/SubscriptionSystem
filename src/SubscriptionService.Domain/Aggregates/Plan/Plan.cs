@@ -1,6 +1,6 @@
 using SharedKernel.Base;
 using SharedKernel.Constants;
-using SharedKernel.Exceptions;
+using SharedKernel.Result;
 using SubscriptionService.Domain.Enums;
 using SubscriptionService.Domain.ValueObjects;
 
@@ -45,7 +45,7 @@ public class Plan : AggregateRoot
     }
 
     /// <summary>Создать новый тарифный план.</summary>
-    public static Plan Create(
+    public static Result<Plan, Error> Create(
         Guid planId,
         string name,
         decimal price,
@@ -53,44 +53,57 @@ public class Plan : AggregateRoot
         DateTimeOffset createdWhen)
     {
         if (planId == Guid.Empty)
-            throw new DomainException(
+            return Result<Plan, Error>.Failure(Error.Validation(
                 DomainErrors.Plan.InvalidId,
                 "ID плана не может быть пустым.",
-                nameof(planId));
+                nameof(planId)));
+
+        if (!Enum.IsDefined(billingPeriod))
+            return Result<Plan, Error>.Failure(Error.Validation(
+                DomainErrors.Plan.InvalidBillingPeriod,
+                $"Неподдерживаемый billing period '{billingPeriod}'.",
+                nameof(billingPeriod)));
 
         var planNameResult = PlanName.Create(name);
+        if (planNameResult.IsFailure)
+            return Result<Plan, Error>.Failure(planNameResult.Error!);
+
         var priceResult = Money.Create(price);
-        
-        return new Plan(
+        if (priceResult.IsFailure)
+            return Result<Plan, Error>.Failure(priceResult.Error!);
+
+        return Result<Plan, Error>.Success(new Plan(
             planId,
-            planNameResult,
-            priceResult,
+            planNameResult.Value!,
+            priceResult.Value!,
             billingPeriod,
-            createdWhen);
+            createdWhen));
     }
 
     /// <summary>
     /// Деактивировать план — новые подписки невозможны.
     /// Существующие подписки продолжают работать.
     /// </summary>
-    public void Deactivate()
+    public Result<Error> Deactivate()
     {
         if (!IsActive)
-            throw new DomainException(
+            return Result<Error>.Failure(Error.Conflict(
                 DomainErrors.Plan.AlreadyDeactivated,
-                "План уже деактивирован.");
+                "План уже деактивирован."));
 
         IsActive = false;
+        return Result<Error>.Success();
     }
 
     /// <summary>Активировать план.</summary>
-    public void Activate()
+    public Result<Error> Activate()
     {
         if (IsActive)
-            throw new DomainException(
+            return Result<Error>.Failure(Error.Conflict(
                 DomainErrors.Plan.AlreadyActive,
-                "План уже активен.");
+                "План уже активен."));
 
         IsActive = true;
+        return Result<Error>.Success();
     }
 }
