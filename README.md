@@ -1,165 +1,112 @@
-# Subscription Service
+# SubscriptionService
 
-REST API для управления подписками пользователей. Построен на Clean Architecture и DDD.
+REST API для управления подписками пользователей на тарифные планы.
 
-## О проекте
+## Что умеет сервис
 
-Сервис позволяет пользователям подписываться на тарифные планы, управлять подписками и отслеживать историю платежей. Реализован полный жизненный цикл подписки — от триального периода до отмены и продления.
+- регистрация пользователей
+- создание тарифных планов
+- получение активных планов
+- создание подписки (с триалом и без)
+- смена плана подписки
+- отмена подписки
+- активация подписки после оплаты счёта
 
-## Стек технологий
+## Технологии
 
-- **.NET 10 / C#**
-- **ASP.NET Core** - Web API
-- **Entity Framework Core 10** - ORM
-- **PostgreSQL** - база данных
-- **MediatR** - CQRS паттерн
-- **FluentValidation** - валидация входных данных
-- **Swagger** - документация API
-- **Docker / Docker Compose** - контейнеризация
+- .NET 10 / ASP.NET Core Web API
+- EF Core + PostgreSQL
+- MediatR (CQRS-стиль)
+- FluentValidation
+- Serilog + Seq
+- Docker Compose
 
-## Архитектура
+## Архитектура (Clean + DDD)
 
-Проект построен по принципам **Clean Architecture** и **DDD**:
-```
+```text
 src/
-├── SharedKernel/                    # Базовые DDD строительные блоки
-│   ├── Base/                        # Entity, AggregateRoot, ValueObject
-│   ├── Result/                      # Result<TValue, Error>, Result<Error>, Error
-│   └── Exceptions/                  # DomainException
-│
-├── SubscriptionService.Domain/      # Доменный слой
-│   ├── Aggregates/
-│   │   ├── Plan/                    # Агрегат тарифного плана
-│   │   ├── Subscription/            # Агрегат подписки + Invoice (Entity)
-│   │   └── User/                    # Агрегат пользователя
-│   ├── ValueObjects/                # Money, PlanName, UserEmail
-│   └── Enums/                       # SubscriptionStatus, InvoiceStatus, BillingPeriod
-│
-├── SubscriptionService.Application/ # Прикладной слой
-│   ├── Abstractions/                # Интерфейсы репозиториев, IUnitOfWork
-│   ├── Behaviors/                   # ValidationBehavior (MediatR Pipeline)
-│   ├── DTOs/                        # SubscriptionResponse, PlanResponse
-│   └── UseCases/
-│       ├── Users/                   # RegisterUser
-│       ├── Plans/                   # CreatePlan, GetActivePlans
-│       └── Subscriptions/           # CreateSubscription, Cancel, ChangePlan, Activate
-│
-├── SubscriptionService.Infrastructure/ # Инфраструктурный слой
-│   ├── Persistence/                 # AppDbContext, EF Core конфигурации
-│   ├── Repositories/                # UserRepository, PlanRepository, SubscriptionRepository
-│   └── UnitOfWork.cs
-│
-└── SubscriptionService.Web/         # Web слой
-    ├── Controllers/                 # UsersController, PlansController, SubscriptionsController
-    ├── Middlewares/                 # ExceptionMiddleware, RequestLoggingMiddleware
-    ├── Contracts/                   # EndpointEnvelope, EndpointResult
-    └── Program.cs
+  SharedKernel/                      # Result/Error, базовые абстракции DDD
+  SubscriptionService.Domain/        # Aggregates + ValueObjects + бизнес-правила
+  SubscriptionService.Application/   # Commands/Queries + Handlers + Validators + Abstractions
+  SubscriptionService.Infrastructure/# EF Core, Repositories, UnitOfWork
+  SubscriptionService.Web/           # Controllers, Middleware, Endpoint contracts/mapping
 ```
 
-## Обработка ошибок и Result pattern
+## Result / Error подход
 
-В приложении используется типизированный результат:
+В проекте используется явный поток ошибок через `Result`:
 
-- `Result<TValue, Error>` — для операций с полезной нагрузкой
-- `Result<Error>` — для операций без payload
+- `Result<TValue, Error>` — операция возвращает данные или ошибку
+- `Result<Error>` — операция без payload (внутренние шаги)
 
-Ошибки возвращаются явно как `Error` (с `ErrorType`), а не через исключения в application-слое.
+`Error` содержит:
 
-## Формат HTTP-ответов (Envelope)
+- `errorCode` (машиночитаемый код)
+- `errorMessage` (понятный текст)
+- `type` (`Validation`, `NotFound`, `Conflict`, `Failure`, ...)
+- `invalidField` (опционально)
 
-Все контроллеры возвращают единый envelope для фронтенда:
+### Как это проходит по слоям
+
+1. `Domain` проверяет инварианты и возвращает `Result`, не бросает бизнес-исключения.
+2. `Application` в handler идёт строгим пайплайном:
+   - валидация команды
+   - проверка наличия/уникальности
+   - вызов доменной фабрики/метода
+   - сохранение через репозиторий + `IUnitOfWork.SaveChangesAsync()`
+   - маппинг инфраструктурной ошибки в `Error`
+3. `Web` маппит `ErrorType -> HTTP` и отдаёт единый envelope.
+
+## Единый формат ответа API
+
+Успех:
 
 ```json
 {
-  "success": true,
-  "data": { },
-  "error": null,
-  "traceId": "0H..."
+  "result": {},
+  "errors": null,
+  "timeGenerated": "2026-01-01T00:00:00Z"
 }
 ```
 
-Для ошибок:
+Ошибка:
 
 ```json
 {
-  "success": false,
-  "data": null,
-  "error": {
-    "errorCode": "409",
-    "errorMessage": "..."
-  },
-  "traceId": "0H..."
+  "result": null,
+  "errors": [
+    {
+      "errorCode": "subscription.not_found",
+      "errorMessage": "Подписка не найдена.",
+      "type": 2,
+      "invalidField": null
+    }
+  ],
+  "timeGenerated": "2026-01-01T00:00:00Z"
 }
 ```
 
-Маппинг `ErrorType -> HTTP status`:
+Маппинг в HTTP:
 
-- `Validation`, `Null` -> `400 BadRequest`
-- `NotFound` -> `404 NotFound`
-- `Conflict` -> `409 Conflict`
-- `Forbidden` -> `403 Forbidden`
-- прочие -> `500 InternalServerError`
+- `Validation` -> `400`
+- `NotFound` -> `404`
+- `Conflict` -> `409`
+- `Failure` -> `500`
 
-## Доменная модель
+## Быстрый старт
 
-**`Plan`** - тарифный план. Администратор создаёт планы (Basic/Pro/Enterprise) с ценой и периодом оплаты.
-
-**`User`** - пользователь. Хранит email и флаг использования триала - триал можно использовать только один раз.
-
-**`Subscription`** - главный агрегат. Управляет жизненным циклом подписки и содержит историю счетов (`Invoice`).
-
-**`Invoice`** - счёт на оплату (Entity внутри Subscription). Каждый период создаётся новый счёт.
-
-### Статусы подписки
-```
-Trial -> Active -> Cancelled
-              -> Expired
-```
-
-### Бизнес-правила
-
-- Нельзя иметь две активные подписки одновременно
-- Триальный период - только один раз на аккаунт (14 дней)
-- Отмена подписки сохраняет доступ до конца периода
-- Нельзя отменить уже истекшую подписку
-
-## API эндпоинты
-
-| Метод | Путь | Описание |
-|-------|------|----------|
-| `POST` | `/api/users` | Зарегистрировать пользователя |
-| `POST` | `/api/plans` | Создать тарифный план |
-| `GET` | `/api/plans/active` | Получить активные планы |
-| `POST` | `/api/subscriptions` | Создать подписку |
-| `GET` | `/api/subscriptions/{id}` | Получить подписку |
-| `POST` | `/api/subscriptions/{id}/cancel` | Отменить подписку |
-| `POST` | `/api/subscriptions/{id}/change-plan` | Сменить план |
-| `POST` | `/api/subscriptions/{id}/activate` | Активировать после оплаты |
-
-### Коды успешных ответов
-
-- `POST /api/users`, `POST /api/plans`, `POST /api/subscriptions` -> `201 Created` + envelope
-- `GET /api/plans/active`, `GET /api/subscriptions/{id}` -> `200 OK` + envelope
-- `POST /api/subscriptions/{id}/cancel`, `change-plan`, `activate` -> `200 OK` + envelope
-
-## Запуск
-
-#### **Не забудьте изменить "YOUR_PASSWORD" в appsettings.json**
-
-**Требования:** Docker, .NET 10 SDK
 ```bash
-# Клонировать репозиторий
-git clone https://github.com/maze37/SubscriptionSystem.git
-cd SubscriptionSystem
-
-# Запустить PostgreSQL
-docker compose up -d
-
-# Применить миграции
-dotnet ef database update \
-  --project src/SubscriptionService.Infrastructure \
-  --startup-project src/SubscriptionService.Web
-
-# Запустить приложение
-dotnet run --project src/SubscriptionService.Web
+docker compose up -d --build
 ```
+
+### Swagger:
+
+- API: `http://localhost:5001/swagger`
+- Seq UI: `http://localhost:8081`
+
+## Важные файлы
+
+- Compose: [compose.yaml](/Users/maze/Projects/SubscriptionService/compose.yaml)
+- Program startup: [Program.cs](/Users/maze/Projects/SubscriptionService/src/SubscriptionService.Web/Program.cs)
+- Error/Result mapping: [ControllerResultExtensions.cs](/Users/maze/Projects/SubscriptionService/src/SubscriptionService.Web/Extensions/ControllerResultExtensions.cs)
+
