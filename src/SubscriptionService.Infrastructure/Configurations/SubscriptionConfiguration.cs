@@ -4,8 +4,12 @@ using SubscriptionService.Domain.Aggregates.Subscription;
 
 namespace SubscriptionService.Infrastructure.Configurations;
 
+/// <summary>
+/// Конфигурация EF Core для агрегата Subscription и вложенных Invoice.
+/// </summary>
 public class SubscriptionConfiguration : IEntityTypeConfiguration<Subscription>
 {
+    /// <summary>Настройка таблиц, полей, owned-коллекции и индексов подписки.</summary>
     public void Configure(EntityTypeBuilder<Subscription> builder)
     {
         ArgumentNullException.ThrowIfNull(builder);

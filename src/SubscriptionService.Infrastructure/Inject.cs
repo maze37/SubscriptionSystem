@@ -6,8 +6,13 @@ using SubscriptionService.Infrastructure.Repositories;
 
 namespace SubscriptionService.Infrastructure;
 
+/// <summary>
+/// Регистрация инфраструктурного слоя в DI.
+/// Подключает EF Core, репозитории и системные провайдеры.
+/// </summary>
 public static class Inject
 {
+    /// <summary>Добавить инфраструктурные зависимости приложения.</summary>
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
         IConfiguration configuration)

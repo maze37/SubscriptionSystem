@@ -1,7 +1,12 @@
 namespace SharedKernel.Base;
 
+/// <summary>
+/// Базовый класс value object.
+/// Равенство определяется значениями, а не ссылкой.
+/// </summary>
 public abstract class ValueObject
 {
+    /// <summary>Набор полей, участвующих в проверке равенства.</summary>
     protected abstract IEnumerable<object> GetEqualityComponents();
     
     public override bool Equals(object? obj)

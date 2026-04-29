@@ -4,7 +4,9 @@ using SubscriptionService.Domain.Aggregates.Plan;
 
 namespace SubscriptionService.Infrastructure.Repositories;
 
-/// Репозиторий для работы с агрегатом Plan
+/// <summary>
+/// Репозиторий для чтения и записи тарифных планов.
+/// </summary>
 public class PlanRepository : IPlanRepository
 {
     private readonly AppDbContext _context;

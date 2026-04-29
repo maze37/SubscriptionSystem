@@ -5,7 +5,9 @@ using SubscriptionService.Domain.Enums;
 
 namespace SubscriptionService.Infrastructure.Repositories;
 
-/// Репозиторий для работы с агрегатом Subscription
+/// <summary>
+/// Репозиторий для чтения и записи подписок.
+/// </summary>
 public class SubscriptionRepository : ISubscriptionRepository
 {
     private readonly AppDbContext _context;

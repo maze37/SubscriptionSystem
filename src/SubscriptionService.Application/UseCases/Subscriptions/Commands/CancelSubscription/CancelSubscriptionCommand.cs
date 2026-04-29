@@ -9,4 +9,6 @@ namespace SubscriptionService.Application.UseCases.Subscriptions.Commands.Cancel
 /// <param name="SubscriptionId">ID подписки.</param>
 public record CancelSubscriptionCommand(Guid SubscriptionId) : ICommand<CancelSubscriptionResponse>;
 
+/// <summary>Результат успешной отмены подписки.</summary>
+/// <param name="SubscriptionId">ID отменённой подписки.</param>
 public record CancelSubscriptionResponse(Guid SubscriptionId);

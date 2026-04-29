@@ -5,8 +5,12 @@ using SubscriptionService.Domain.ValueObjects;
 
 namespace SubscriptionService.Infrastructure.Configurations;
 
+/// <summary>
+/// Конфигурация EF Core для агрегата User.
+/// </summary>
 public class UserConfiguration : IEntityTypeConfiguration<User>
 {
+    /// <summary>Настройка таблицы и колонок пользователя.</summary>
     public void Configure(EntityTypeBuilder<User> builder)
     {
         ArgumentNullException.ThrowIfNull(builder);

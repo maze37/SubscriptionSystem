@@ -5,8 +5,13 @@ using SubscriptionService.Application.Behaviors;
 
 namespace SubscriptionService.Application;
 
+/// <summary>
+/// Регистрация сервисов слоя Application.
+/// Подключает MediatR, handlers и FluentValidation pipeline.
+/// </summary>
 public static class Inject
 {
+    /// <summary>Добавить зависимости Application в DI-контейнер.</summary>
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         services.AddMediatR(cfg =>

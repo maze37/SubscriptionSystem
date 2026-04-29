@@ -2,15 +2,24 @@ namespace SharedKernel.Result;
 
 using System.Globalization;
 
+/// <summary>
+/// Единая модель ошибки для всех слоев.
+/// Содержит код, сообщение, тип и проблемное поле при валидации.
+/// </summary>
 public class Error
 {
     private const string separator = "||";
 
+    /// <summary>Отсутствие ошибки.</summary>
     public static readonly Error None = new(string.Empty, string.Empty, ErrorType.None);
 
+    /// <summary>Машиночитаемый код ошибки.</summary>
     public string ErrorCode { get; }
+    /// <summary>Сообщение для клиента или логов.</summary>
     public string ErrorMessage { get; }
+    /// <summary>Тип ошибки для маппинга в HTTP-код.</summary>
     public ErrorType Type { get; }
+    /// <summary>Поле с некорректным значением, если применимо.</summary>
     public string? InvalidField { get; }
 
     private Error(string errorCode, string errorMessage, ErrorType type, string? invalidField = null)
@@ -21,6 +30,7 @@ public class Error
         InvalidField = invalidField;
     }
 
+    /// <summary>Создать ошибку с произвольными параметрами.</summary>
     public static Error Create(
         string errorCode,
         string errorMessage,
@@ -28,11 +38,13 @@ public class Error
         string? invalidField = null) =>
         new(errorCode, errorMessage, type, invalidField);
 
+    /// <summary>Сериализовать ошибку в строку.</summary>
     public string Serialize()
     {
         return string.Join(separator, ErrorCode, ErrorMessage, Type);
     }
 
+    /// <summary>Восстановить ошибку из строки.</summary>
     public static Error Deserialize(string serialized)
     {
         _ = serialized ?? throw new ArgumentNullException(nameof(serialized));
@@ -87,6 +99,7 @@ public class Error
         new(ErrorCodes.BadRequest.ToString(CultureInfo.InvariantCulture), errorMessage, ErrorType.Null, invalidField);
 #pragma warning restore CA1305
 
+    /// <summary>Преобразовать ошибку в список из одного элемента.</summary>
     public ErrorList ToErrorList() => new([this]);
 
     public override string ToString()
@@ -97,11 +110,18 @@ public class Error
 
 public enum ErrorType
 {
+    /// <summary>Ошибки нет.</summary>
     None,
+    /// <summary>Ошибка валидации входных данных.</summary>
     Validation,
+    /// <summary>Сущность не найдена.</summary>
     NotFound,
+    /// <summary>Операция запрещена.</summary>
     Forbidden,
+    /// <summary>Системная ошибка выполнения.</summary>
     Failure,
+    /// <summary>Передано null или пустое значение.</summary>
     Null,
+    /// <summary>Конфликт состояния.</summary>
     Conflict
 }

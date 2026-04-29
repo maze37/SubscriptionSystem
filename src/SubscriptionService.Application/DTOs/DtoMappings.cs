@@ -3,8 +3,12 @@ using SubscriptionService.Domain.Aggregates.Subscription;
 
 namespace SubscriptionService.Application.DTOs;
 
+/// <summary>
+/// Маппинг доменных моделей в DTO для API-ответов.
+/// </summary>
 public static class DtoMappings
 {
+    /// <summary>Преобразовать тарифный план в DTO ответа.</summary>
     public static PlanResponse ToResponse(this Plan plan)
     {
         ArgumentNullException.ThrowIfNull(plan);
@@ -17,6 +21,7 @@ public static class DtoMappings
             plan.IsActive);
     }
 
+    /// <summary>Преобразовать подписку в DTO ответа.</summary>
     public static SubscriptionResponse ToResponse(this Subscription subscription)
     {
         ArgumentNullException.ThrowIfNull(subscription);
@@ -33,6 +38,7 @@ public static class DtoMappings
             subscription.Invoices.Select(ToResponse).ToList());
     }
 
+    /// <summary>Преобразовать счёт на оплату в DTO ответа.</summary>
     public static InvoiceResponse ToResponse(this Invoice invoice)
     {
         ArgumentNullException.ThrowIfNull(invoice);

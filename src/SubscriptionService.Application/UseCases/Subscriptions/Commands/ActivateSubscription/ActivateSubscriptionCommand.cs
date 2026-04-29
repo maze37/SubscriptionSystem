@@ -12,4 +12,7 @@ public record ActivateSubscriptionCommand(
     Guid SubscriptionId,
     Guid InvoiceId) : ICommand<ActivateSubscriptionResponse>;
 
+/// <summary>Результат успешной активации подписки.</summary>
+/// <param name="SubscriptionId">ID подписки.</param>
+/// <param name="InvoiceId">ID оплаченного счёта.</param>
 public record ActivateSubscriptionResponse(Guid SubscriptionId, Guid InvoiceId);

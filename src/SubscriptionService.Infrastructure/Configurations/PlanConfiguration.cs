@@ -5,8 +5,12 @@ using SubscriptionService.Domain.ValueObjects;
 
 namespace SubscriptionService.Infrastructure.Configurations;
 
+/// <summary>
+/// Конфигурация EF Core для агрегата Plan.
+/// </summary>
 public class PlanConfiguration : IEntityTypeConfiguration<Plan>
 {
+    /// <summary>Настройка таблицы и колонок тарифного плана.</summary>
     public void Configure(EntityTypeBuilder<Plan> builder)
     {
         ArgumentNullException.ThrowIfNull(builder);

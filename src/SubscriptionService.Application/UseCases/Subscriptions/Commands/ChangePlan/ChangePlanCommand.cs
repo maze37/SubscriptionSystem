@@ -12,4 +12,7 @@ public record ChangePlanCommand(
     Guid SubscriptionId,
     Guid NewPlanId) : ICommand<ChangePlanResponse>;
 
+/// <summary>Результат успешной смены плана.</summary>
+/// <param name="SubscriptionId">ID подписки.</param>
+/// <param name="NewPlanId">ID нового выбранного плана.</param>
 public record ChangePlanResponse(Guid SubscriptionId, Guid NewPlanId);
