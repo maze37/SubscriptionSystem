@@ -1,5 +1,5 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Microsoft.EntityFrameworkCore;
 using SubscriptionService.Domain.Aggregates.Plan;
 using SubscriptionService.Domain.ValueObjects;
 
@@ -10,14 +10,16 @@ namespace SubscriptionService.Infrastructure.Configurations;
 /// </summary>
 public class PlanConfiguration : IEntityTypeConfiguration<Plan>
 {
-    /// <summary>Настройка таблицы и колонок тарифного плана.</summary>
     public void Configure(EntityTypeBuilder<Plan> builder)
     {
-        ArgumentNullException.ThrowIfNull(builder);
-
         builder.ToTable("plans");
         builder.HasKey(p => p.Id);
         builder.Property(p => p.Id).HasColumnName("id");
+
+        builder.Property(p => p.Version)
+            .HasColumnName("Version")
+            .IsConcurrencyToken()
+            .IsRequired();
 
         builder.ComplexProperty(p => p.Name, nameBuilder =>
         {

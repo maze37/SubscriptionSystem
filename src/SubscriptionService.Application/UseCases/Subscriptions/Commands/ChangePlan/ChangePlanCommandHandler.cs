@@ -1,6 +1,9 @@
+using Core.Database;
+using CSharpFunctionalExtensions;
+using SharedKernel;
+using Core.Abstractions;
 using SubscriptionService.Application.Abstractions;
-using SubscriptionService.Application.Abstractions.Core;
-using SharedKernel.Result;
+using SubscriptionService.Application.DTOs;
 
 namespace SubscriptionService.Application.UseCases.Subscriptions.Commands.ChangePlan;
 
@@ -12,63 +15,73 @@ public class ChangePlanCommandHandler : ICommandHandler<ChangePlanCommand, Chang
 {
     private readonly ISubscriptionRepository _subscriptionRepository;
     private readonly IPlanRepository _planRepository;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly ITransactionManager _transactionManager;
     private readonly IDateTimeProvider _dateTime;
 
     public ChangePlanCommandHandler(
         ISubscriptionRepository subscriptionRepository,
         IPlanRepository planRepository,
-        IUnitOfWork unitOfWork,
+        ITransactionManager transactionManager,
         IDateTimeProvider dateTime)
     {
-        _subscriptionRepository = subscriptionRepository ?? throw new ArgumentNullException(nameof(subscriptionRepository));
-        _planRepository = planRepository ?? throw new ArgumentNullException(nameof(planRepository));
-        _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
-        _dateTime = dateTime ?? throw new ArgumentNullException(nameof(dateTime));
+        _subscriptionRepository = subscriptionRepository;
+        _planRepository = planRepository;
+        _transactionManager = transactionManager;
+        _dateTime = dateTime;
     }
 
     /// <inheritdoc/>
-    public async Task<Result<ChangePlanResponse, Error>> Handle(
+    public async Task<Result<ChangePlanResponse, Error>> HandleAsync(
         ChangePlanCommand command,
         CancellationToken cancellationToken)
     {
-        var subscription = await _subscriptionRepository
-            .GetByIdAsync(command.SubscriptionId, cancellationToken)
-            .ConfigureAwait(false);
+        if (command.SubscriptionId == Guid.Empty)
+            return GeneralErrors.ValueIsInvalid(nameof(command.SubscriptionId));
 
-        if (subscription is null)
-            return Result<ChangePlanResponse, Error>.Failure(
-                Error.NotFound("subscription.not_found", $"Подписка с ID '{command.SubscriptionId}' не найдена."));
+        if (command.Request.NewPlanId == Guid.Empty)
+            return GeneralErrors.ValueIsInvalid(nameof(command.Request.NewPlanId));
+
+        var transactionResult = await _transactionManager
+            .BeginTransactionAsync(cancellationToken);
+        if (transactionResult.IsFailure)
+            return transactionResult.Error;
+
+        using var transaction = transactionResult.Value;
+
+        var subscription = await _subscriptionRepository
+            .GetByIdAsync(command.SubscriptionId, cancellationToken);
+
+        if (subscription.IsFailure)
+            return subscription.Error;
 
         var plan = await _planRepository
-            .GetByIdAsync(command.NewPlanId, cancellationToken)
-            .ConfigureAwait(false);
+            .GetByIdAsync(command.Request.NewPlanId, cancellationToken);
 
-        if (plan is null)
-            return Result<ChangePlanResponse, Error>.Failure(
-                Error.NotFound("plan.not_found", $"План с ID '{command.NewPlanId}' не найден."));
+        if (plan.IsFailure)
+            return plan.Error;
 
-        if (!plan.IsActive)
-            return Result<ChangePlanResponse, Error>.Failure(
-                Error.Conflict("plan.inactive", "Нельзя сменить на неактивный план."));
+        if (!plan.Value.IsActive)
+            return GeneralErrors.InvalidOperation("Нельзя сменить на неактивный план.");
 
-        var changeResult = subscription.ChangePlan(
+        var changeResult = subscription.Value.ChangePlan(
             Guid.NewGuid(),
-            command.NewPlanId,
-            plan.Price,
+            plan.Value.Id,
+            plan.Value.Price,
             _dateTime.UtcNow);
         if (changeResult.IsFailure)
-            return Result<ChangePlanResponse, Error>.Failure(changeResult.Error!);
+            return changeResult.Error;
 
-        _subscriptionRepository.Update(subscription);
+        _subscriptionRepository.Update(subscription.Value);
 
-        var saveResult = await _unitOfWork
-            .SaveChangesAsync(cancellationToken)
-            .ConfigureAwait(false);
+        var saveResult = await _transactionManager
+            .SaveChangesAsync(cancellationToken);
         if (saveResult.IsFailure)
-            return Result<ChangePlanResponse, Error>.Failure(saveResult.Error!);
+            return saveResult.Error;
 
-        return Result<ChangePlanResponse, Error>.Success(
-            new ChangePlanResponse(subscription.Id, command.NewPlanId));
+        var commitResult = transaction.Commit();
+        if (commitResult.IsFailure)
+            return commitResult.Error;
+
+        return new ChangePlanResponse(subscription.Value.Id, command.Request.NewPlanId);
     }
 }

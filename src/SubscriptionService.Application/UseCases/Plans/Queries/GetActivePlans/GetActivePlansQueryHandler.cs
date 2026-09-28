@@ -1,7 +1,8 @@
+using CSharpFunctionalExtensions;
+using SharedKernel;
+using Core.Abstractions;
 using SubscriptionService.Application.Abstractions;
-using SubscriptionService.Application.Abstractions.Core;
 using SubscriptionService.Application.DTOs;
-using SharedKernel.Result;
 
 namespace SubscriptionService.Application.UseCases.Plans.Queries.GetActivePlans;
 
@@ -10,29 +11,35 @@ namespace SubscriptionService.Application.UseCases.Plans.Queries.GetActivePlans;
 /// Возвращает все активные планы отсортированные по цене.
 /// </summary>
 public class GetActivePlansQueryHandler
-    : IQueryHandler<GetActivePlansQuery, IReadOnlyList<PlanResponse>>
+    : IQueryHandlerWithResult<GetActivePlansQuery, GetActivePlansResponse>
 {
     private readonly IPlanRepository _planRepository;
 
     public GetActivePlansQueryHandler(IPlanRepository planRepository)
     {
-        _planRepository = planRepository
-                          ?? throw new ArgumentNullException(nameof(planRepository));
+        _planRepository = planRepository;
     }
 
     /// <inheritdoc/>
-    public async Task<Result<IReadOnlyList<PlanResponse>, Error>> Handle(
+    public async Task<Result<GetActivePlansResponse, Error>> HandleAsync(
         GetActivePlansQuery query,
         CancellationToken cancellationToken)
     {
-        var plans = await _planRepository
-            .GetAllActiveAsync(cancellationToken)
-            .ConfigureAwait(false);
+        var plansResult = await _planRepository
+            .GetAllActiveAsync(cancellationToken);
 
-        var response = plans
-            .Select(p => p.ToResponse())
+        if (plansResult.IsFailure)
+            return plansResult.Error;
+
+        var response = plansResult.Value
+            .Select(plan => new PlanResponse(
+                plan.Id,
+                plan.Name,
+                plan.Price,
+                plan.BillingPeriod,
+                plan.IsActive))
             .ToList();
 
-        return Result<IReadOnlyList<PlanResponse>, Error>.Success(response);
+        return new GetActivePlansResponse(response);
     }
 }

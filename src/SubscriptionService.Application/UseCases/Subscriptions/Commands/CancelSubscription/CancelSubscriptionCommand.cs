@@ -1,4 +1,5 @@
-using SubscriptionService.Application.Abstractions.Core;
+using Core.Abstractions;
+using SubscriptionService.Application.DTOs;
 
 namespace SubscriptionService.Application.UseCases.Subscriptions.Commands.CancelSubscription;
 
@@ -6,9 +7,4 @@ namespace SubscriptionService.Application.UseCases.Subscriptions.Commands.Cancel
 /// Команда отмены подписки.
 /// Доступ сохраняется до конца текущего периода (CancelAtPeriodEnd = true).
 /// </summary>
-/// <param name="SubscriptionId">ID подписки.</param>
-public record CancelSubscriptionCommand(Guid SubscriptionId) : ICommand<CancelSubscriptionResponse>;
-
-/// <summary>Результат успешной отмены подписки.</summary>
-/// <param name="SubscriptionId">ID отменённой подписки.</param>
-public record CancelSubscriptionResponse(Guid SubscriptionId);
+public record CancelSubscriptionCommand(CancelSubscriptionRequest Request) : ICommand;

@@ -1,27 +1,46 @@
-using FluentValidation;
-using MediatR;
+using System.Reflection;
+using Core.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
-using SubscriptionService.Application.Behaviors;
 
 namespace SubscriptionService.Application;
 
 /// <summary>
 /// Регистрация сервисов слоя Application.
-/// Подключает MediatR, handlers и FluentValidation pipeline.
+/// Регистрирует обработчики команд и запросов.
 /// </summary>
 public static class Inject
 {
-    /// <summary>Добавить зависимости Application в DI-контейнер.</summary>
-    public static IServiceCollection AddApplication(this IServiceCollection services)
+    /// <summary>
+    /// Добавить зависимости Application в DI-контейнер.
+    /// </summary>
+    public static IServiceCollection AddApplication(
+        this IServiceCollection services)
     {
-        services.AddMediatR(cfg =>
-        {
-            cfg.RegisterServicesFromAssembly(typeof(Inject).Assembly);
-            cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
-        });
-        
-        // Находим всех наследников AbstractValidator
-        services.AddValidatorsFromAssembly(typeof(Inject).Assembly);
+        var assembly = Assembly.GetExecutingAssembly();
+
+        services.Scan(scan => scan
+            .FromAssemblies(assembly)
+            .AddClasses(classes => classes
+                .AssignableToAny(
+                    typeof(ICommandHandler<,>),
+                    typeof(ICommandHandler<>)
+                ))
+            .AsSelfWithInterfaces()
+            .WithTransientLifetime());
+
+        services.Scan(scan => scan
+            .FromAssemblies(assembly)
+            .AddClasses(classes => classes
+                .AssignableTo(typeof(IQueryHandler<,>)))
+            .AsImplementedInterfaces()
+            .WithTransientLifetime());
+
+        services.Scan(scan => scan
+            .FromAssemblies(assembly)
+            .AddClasses(classes => classes
+                .AssignableTo(typeof(IQueryHandlerWithResult<,>)))
+            .AsImplementedInterfaces()
+            .WithTransientLifetime());
 
         return services;
     }

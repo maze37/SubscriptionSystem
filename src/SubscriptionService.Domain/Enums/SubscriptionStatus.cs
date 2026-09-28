@@ -1,6 +1,10 @@
+using CSharpFunctionalExtensions;
+using SharedKernel;
 namespace SubscriptionService.Domain.Enums;
 
-/// <summary>Статус подписки.</summary>
+/// <summary>
+/// Статус подписки.
+/// </summary>
 public enum SubscriptionStatus
 {
     Trial = 1,

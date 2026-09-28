@@ -44,7 +44,9 @@ namespace SubscriptionService.Infrastructure.Migrations
                         .HasColumnName("is_active");
 
                     b.Property<int>("Version")
-                        .HasColumnType("integer");
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("Version");
 
                     b.ComplexProperty(typeof(Dictionary<string, object>), "Name", "SubscriptionService.Domain.Aggregates.Plan.Plan.Name#PlanName", b1 =>
                         {
@@ -117,7 +119,9 @@ namespace SubscriptionService.Infrastructure.Migrations
                         .HasColumnName("user_id");
 
                     b.Property<int>("Version")
-                        .HasColumnType("integer");
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("Version");
 
                     b.HasKey("Id");
 
@@ -143,7 +147,9 @@ namespace SubscriptionService.Infrastructure.Migrations
                         .HasColumnName("has_used_trial");
 
                     b.Property<int>("Version")
-                        .HasColumnType("integer");
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("Version");
 
                     b.ComplexProperty(typeof(Dictionary<string, object>), "Email", "SubscriptionService.Domain.Aggregates.User.User.Email#UserEmail", b1 =>
                         {
@@ -166,7 +172,6 @@ namespace SubscriptionService.Infrastructure.Migrations
                     b.OwnsMany("SubscriptionService.Domain.Aggregates.Subscription.Invoice", "Invoices", b1 =>
                         {
                             b1.Property<Guid>("Id")
-                                .ValueGeneratedOnAdd()
                                 .HasColumnType("uuid")
                                 .HasColumnName("id");
 

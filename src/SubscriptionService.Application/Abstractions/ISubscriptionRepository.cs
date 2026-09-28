@@ -1,25 +1,37 @@
+using CSharpFunctionalExtensions;
+using SharedKernel;
 using SubscriptionService.Domain.Aggregates.Subscription;
 
 namespace SubscriptionService.Application.Abstractions;
 
 /// <summary>
 /// Репозиторий подписок.
-/// Все методы записи не сохраняют изменения — вызывай IUnitOfWork.SaveChangesAsync.
+/// Методы записи не сохраняют изменения самостоятельно.
 /// </summary>
 public interface ISubscriptionRepository
 {
-    /// <summary>Получить подписку по ID включая Invoice. Возвращает null если не найдена.</summary>
-    Task<Subscription?> GetByIdAsync(Guid id, CancellationToken ct = default);
+    /// <summary>
+    /// Получить подписку по ID вместе со счетами или ошибку, если подписка не найдена.
+    /// </summary>
+    Task<Result<Subscription, Error>> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
-    /// <summary>Получить активную подписку пользователя (Trial или Active).</summary>
-    Task<Subscription?> GetActiveByUserIdAsync(Guid userId, CancellationToken ct = default);
+    /// <summary>
+    /// Получить активную подписку пользователя или ошибку, если подписка не найдена.
+    /// </summary>
+    Task<Result<Subscription, Error>> GetActiveByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
 
-    /// <summary>Проверить есть ли у пользователя активная подписка.</summary>
-    Task<bool> HasActiveSubscriptionAsync(Guid userId, CancellationToken ct = default);
+    /// <summary>
+    /// Проверить есть ли у пользователя активная подписка.
+    /// </summary>
+    Task<bool> HasActiveSubscriptionAsync(Guid userId, CancellationToken cancellationToken = default);
 
-    /// <summary>Добавить новую подписку. Требует SaveChangesAsync.</summary>
+    /// <summary>
+    /// Добавить новую подписку.
+    /// </summary>
     void Add(Subscription subscription);
 
-    /// <summary>Обновить подписку. Требует SaveChangesAsync.</summary>
+    /// <summary>
+    /// Обновить подписку.
+    /// </summary>
     void Update(Subscription subscription);
 }

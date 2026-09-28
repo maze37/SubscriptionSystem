@@ -1,6 +1,10 @@
+using CSharpFunctionalExtensions;
+using SharedKernel;
 namespace SubscriptionService.Domain.Enums;
 
-/// <summary>Период оплаты подписки.</summary>
+/// <summary>
+/// Период оплаты подписки.
+/// </summary>
 public enum BillingPeriod
 {
     Monthly = 1,

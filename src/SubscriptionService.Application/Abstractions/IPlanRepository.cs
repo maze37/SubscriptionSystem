@@ -1,19 +1,27 @@
+using CSharpFunctionalExtensions;
+using SharedKernel;
 using SubscriptionService.Domain.Aggregates.Plan;
 
 namespace SubscriptionService.Application.Abstractions;
 
 /// <summary>
 /// Репозиторий тарифных планов.
-/// Все методы записи не сохраняют изменения — вызывай IUnitOfWork.SaveChangesAsync.
+/// Методы записи не сохраняют изменения самостоятельно.
 /// </summary>
 public interface IPlanRepository
 {
-    /// <summary>Получить план по ID. Возвращает null если не найден.</summary>
-    Task<Plan?> GetByIdAsync(Guid id, CancellationToken ct = default);
+    /// <summary>
+    /// Получить план по ID или ошибку, если план не найден.
+    /// </summary>
+    Task<Result<Plan, Error>> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
-    /// <summary>Получить все активные планы отсортированные по цене.</summary>
-    Task<IReadOnlyList<Plan>> GetAllActiveAsync(CancellationToken ct = default);
+    /// <summary>
+    /// Получить все активные планы, отсортированные по цене.
+    /// </summary>
+    Task<Result<IReadOnlyList<Plan>, Error>> GetAllActiveAsync(CancellationToken cancellationToken = default);
 
-    /// <summary>Добавить новый план. Требует SaveChangesAsync.</summary>
+    /// <summary>
+    /// Добавить новый план.
+    /// </summary>
     void Add(Plan plan);
 }

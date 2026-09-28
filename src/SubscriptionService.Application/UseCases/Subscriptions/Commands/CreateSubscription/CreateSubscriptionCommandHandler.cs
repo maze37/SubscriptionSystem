@@ -1,7 +1,10 @@
+using Core.Database;
+using CSharpFunctionalExtensions;
+using SharedKernel;
+using Core.Abstractions;
 using SubscriptionService.Application.Abstractions;
-using SubscriptionService.Application.Abstractions.Core;
+using SubscriptionService.Application.DTOs;
 using SubscriptionService.Domain.Aggregates.Subscription;
-using SharedKernel.Result;
 
 namespace SubscriptionService.Application.UseCases.Subscriptions.Commands.CreateSubscription;
 
@@ -10,92 +13,95 @@ namespace SubscriptionService.Application.UseCases.Subscriptions.Commands.Create
 /// Проверяет пользователя, триал, активные подписки и план.
 /// Создаёт подписку и сохраняет.
 /// </summary>
-public class CreateSubscriptionCommandHandler : ICommandHandler<CreateSubscriptionCommand, Guid>
+public class CreateSubscriptionCommandHandler : ICommandHandler<CreateSubscriptionCommand, CreateSubscriptionResponse>
 {
     private readonly ISubscriptionRepository _subscriptionRepository;
     private readonly IUserRepository _userRepository;
     private readonly IPlanRepository _planRepository;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly ITransactionManager _transactionManager;
     private readonly IDateTimeProvider _dateTime;
 
     public CreateSubscriptionCommandHandler(
         ISubscriptionRepository subscriptionRepository,
         IUserRepository userRepository,
         IPlanRepository planRepository,
-        IUnitOfWork unitOfWork,
+        ITransactionManager transactionManager,
         IDateTimeProvider dateTime)
     {
-        _subscriptionRepository = subscriptionRepository ?? throw new ArgumentNullException(nameof(subscriptionRepository));
-        _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
-        _planRepository = planRepository ?? throw new ArgumentNullException(nameof(planRepository));
-        _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
-        _dateTime = dateTime ?? throw new ArgumentNullException(nameof(dateTime));
+        _subscriptionRepository = subscriptionRepository;
+        _userRepository = userRepository;
+        _planRepository = planRepository;
+        _transactionManager = transactionManager;
+        _dateTime = dateTime;
     }
 
     /// <inheritdoc/>
-    public async Task<Result<Guid, Error>> Handle(
+    public async Task<Result<CreateSubscriptionResponse, Error>> HandleAsync(
         CreateSubscriptionCommand command,
         CancellationToken cancellationToken)
     {
+        if (command.Request.PlanId == Guid.Empty)
+            return GeneralErrors.ValueIsInvalid(nameof(command.Request.PlanId), "ID плана не может быть пустым.");
+
+        if (command.Request.UserId == Guid.Empty)
+            return GeneralErrors.ValueIsInvalid(nameof(command.Request.UserId), "ID пользователя не может быть пустым.");
+
+        var transactionResult = await _transactionManager
+            .BeginTransactionAsync(cancellationToken);
+        if (transactionResult.IsFailure)
+            return transactionResult.Error;
+
+        using var transaction = transactionResult.Value;
+
         var user = await _userRepository
-            .GetByIdAsync(command.UserId, cancellationToken)
-            .ConfigureAwait(false);
+            .GetByIdAsync(command.Request.UserId, cancellationToken);
 
-        if (user is null)
-            return Result<Guid, Error>.Failure(
-                Error.NotFound("user.not_found", $"Пользователь с ID '{command.UserId}' не найден."));
-
-        if (command.WithTrial && user.HasUsedTrial)
-            return Result<Guid, Error>.Failure(
-                Error.Conflict("user.trial_already_used", "Триальный период уже был использован."));
+        if (user.IsFailure)
+            return user.Error;
 
         var hasActive = await _subscriptionRepository
-            .HasActiveSubscriptionAsync(command.UserId, cancellationToken)
-            .ConfigureAwait(false);
+            .HasActiveSubscriptionAsync(command.Request.UserId, cancellationToken);
 
         if (hasActive)
-            return Result<Guid, Error>.Failure(
-                Error.Conflict("subscription.active_exists", "У пользователя уже есть активная подписка."));
+            return GeneralErrors.AlreadyExists("Активная подписка");
 
         var plan = await _planRepository
-            .GetByIdAsync(command.PlanId, cancellationToken)
-            .ConfigureAwait(false);
+            .GetByIdAsync(command.Request.PlanId, cancellationToken);
 
-        if (plan is null)
-            return Result<Guid, Error>.Failure(
-                Error.NotFound("plan.not_found", $"План с ID '{command.PlanId}' не найден."));
+        if (plan.IsFailure)
+            return plan.Error;
 
-        if (!plan.IsActive)
-            return Result<Guid, Error>.Failure(
-                Error.Conflict("plan.inactive", "Нельзя подписаться на неактивный план."));
+        if (!plan.Value.IsActive)
+            return GeneralErrors.InvalidOperation("Нельзя подписаться на неактивный план.");
 
-        if (command.WithTrial)
+        if (command.Request.WithTrial)
         {
-            var markTrialResult = user.MarkTrialUsed();
+            var markTrialResult = user.Value.MarkTrialUsed();
             if (markTrialResult.IsFailure)
-                return Result<Guid, Error>.Failure(markTrialResult.Error!);
+                return markTrialResult.Error;
         }
 
         var subscription = Subscription.Create(
             Guid.NewGuid(),
-            command.UserId,
-            command.PlanId,
+            command.Request.UserId,
+            command.Request.PlanId,
             Guid.NewGuid(),
-            plan.Price,
-            plan.BillingPeriod,
-            command.WithTrial,
+            plan.Value.Price,
+            plan.Value.BillingPeriod,
+            command.Request.WithTrial,
             _dateTime.UtcNow);
-        if (subscription.IsFailure)
-            return Result<Guid, Error>.Failure(subscription.Error!);
 
-        _subscriptionRepository.Add(subscription.Value!);
+        _subscriptionRepository.Add(subscription);
 
-        var saveResult = await _unitOfWork
-            .SaveChangesAsync(cancellationToken)
-            .ConfigureAwait(false);
+        var saveResult = await _transactionManager
+            .SaveChangesAsync(cancellationToken);
         if (saveResult.IsFailure)
-            return Result<Guid, Error>.Failure(saveResult.Error!);
+            return saveResult.Error;
 
-        return Result<Guid, Error>.Success(subscription.Value!.Id);
+        var commitResult = transaction.Commit();
+        if (commitResult.IsFailure)
+            return commitResult.Error;
+
+        return new CreateSubscriptionResponse(subscription.Id);
     }
 }

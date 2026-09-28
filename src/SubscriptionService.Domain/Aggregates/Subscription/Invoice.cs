@@ -1,6 +1,5 @@
-using SharedKernel.Base;
-using SharedKernel.Constants;
-using SharedKernel.Result;
+using CSharpFunctionalExtensions;
+using SharedKernel;
 using SubscriptionService.Domain.Enums;
 using SubscriptionService.Domain.ValueObjects;
 
@@ -8,96 +7,99 @@ namespace SubscriptionService.Domain.Aggregates.Subscription;
 
 /// <summary>
 /// Счёт на оплату подписки.
-/// Entity внутри агрегата Subscription — не существует без подписки.
+/// Entity внутри агрегата Subscription - не существует без подписки.
 /// </summary>
-public class Invoice : Entity
+public class Invoice
 {
-    /// <summary>Сумма к оплате.</summary>
+    public Guid Id { get; private set; }
+
+    /// <summary>
+    /// Сумма к оплате.
+    /// </summary>
     public Money Amount { get; private set; } = null!;
 
-    /// <summary>Статус счёта.</summary>
+    /// <summary>
+    /// Статус счёта.
+    /// </summary>
     public InvoiceStatus Status { get; private set; }
-    
-    /// <summary>Срок оплаты.</summary>
+
+    /// <summary>
+    /// Срок оплаты.
+    /// </summary>
     public DateTimeOffset DueDate { get; private set; }
 
-    /// <summary>Дата создания счёта.</summary>
+    /// <summary>
+    /// Дата создания счёта.
+    /// </summary>
     public DateTimeOffset CreatedWhen { get; private set; }
 
-    /// <summary>Дата оплаты (null если не оплачен).</summary>
+    /// <summary>
+    /// Дата оплаты (null если не оплачен).
+    /// </summary>
     public DateTimeOffset? PaidWhen { get; private set; }
 
-    /// <summary>Для EF Core.</summary>
-    private Invoice() : base(Guid.Empty) { }
+    /// <summary>
+    /// Для EF Core.
+    /// </summary>
+    private Invoice()  { }
 
     private Invoice(
         Guid id,
         Money amount,
         DateTimeOffset dueDate,
-        DateTimeOffset createdWhen) : base(id)
+        DateTimeOffset createdWhen)
     {
+        Id = id;
         Amount = amount;
         Status = InvoiceStatus.Pending;
         DueDate = dueDate;
         CreatedWhen = createdWhen;
     }
 
-    /// <summary>Создать новый счёт на оплату.</summary>
-    public static Result<Invoice, Error> Create(
+    /// <summary>
+    /// Создать новый счёт на оплату.
+    /// </summary>
+    public static Invoice Create(
         Guid invoiceId,
         Money amount,
         DateTimeOffset dueDate,
         DateTimeOffset createdWhen)
     {
-        if (invoiceId == Guid.Empty)
-            return Result<Invoice, Error>.Failure(Error.Validation(
-                DomainErrors.Invoice.InvalidId,
-                "ID счёта не может быть пустым.",
-                nameof(invoiceId)));
-
-        var moneyResult = Money.Create(amount);
-        if (moneyResult.IsFailure)
-            return Result<Invoice, Error>.Failure(moneyResult.Error!);
-
-        return Result<Invoice, Error>.Success(new Invoice(
+        return new Invoice(
             invoiceId,
-            moneyResult.Value!,
-            dueDate, 
-            createdWhen));
+            amount,
+            dueDate,
+            createdWhen);
     }
 
-    /// <summary>Отметить счёт как оплаченный.</summary>
-    public Result<Error> MarkAsPaid(DateTimeOffset paidWhen)
+    /// <summary>
+    /// Отметить счёт как оплаченный.
+    /// </summary>
+    public UnitResult<Error> MarkAsPaid(DateTimeOffset paidWhen)
     {
         if (Status == InvoiceStatus.Paid)
-            return Result<Error>.Failure(Error.Conflict(
-                DomainErrors.Invoice.AlreadyPaid,
-                "Счёт уже оплачен."));
+            return GeneralErrors.InvalidOperation("Счёт уже оплачен.");
 
         if (Status == InvoiceStatus.Failed)
-            return Result<Error>.Failure(Error.Conflict(
-                DomainErrors.Invoice.AlreadyFailed,
-                "Нельзя оплатить отклонённый счёт."));
+            return GeneralErrors.InvalidOperation("Нельзя оплатить отклонённый счёт.");
 
         Status = InvoiceStatus.Paid;
         PaidWhen = paidWhen;
-        return Result<Error>.Success();
+        return UnitResult.Success<Error>();
     }
 
-    /// <summary>Отметить счёт как неоплаченный (платёж отклонён).</summary>
-    public Result<Error> MarkAsFailed()
+    /// <summary>
+    /// Отметить счёт как неоплаченный (платёж отклонён).
+    /// </summary>
+    public UnitResult<Error> MarkAsFailed()
     {
         if (Status == InvoiceStatus.Paid)
-            return Result<Error>.Failure(Error.Conflict(
-                DomainErrors.Invoice.AlreadyPaid,
-                "Нельзя отклонить уже оплаченный счёт."));
+            return GeneralErrors.InvalidOperation("Нельзя отклонить уже оплаченный счёт.");
 
         if (Status == InvoiceStatus.Failed)
-            return Result<Error>.Failure(Error.Conflict(
-                DomainErrors.Invoice.AlreadyFailed,
-                "Счёт уже отклонён."));
+            return GeneralErrors.InvalidOperation("Счёт уже отклонён.");
 
         Status = InvoiceStatus.Failed;
-        return Result<Error>.Success();
+        return UnitResult.Success<Error>();
     }
 }

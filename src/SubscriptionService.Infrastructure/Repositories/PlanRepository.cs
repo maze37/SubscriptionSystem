@@ -1,4 +1,6 @@
+using CSharpFunctionalExtensions;
 using Microsoft.EntityFrameworkCore;
+using SharedKernel;
 using SubscriptionService.Application.Abstractions;
 using SubscriptionService.Domain.Aggregates.Plan;
 
@@ -13,31 +15,36 @@ public class PlanRepository : IPlanRepository
 
     public PlanRepository(AppDbContext context)
     {
-        _context = context ?? throw new ArgumentNullException(nameof(context));
+        _context = context;
     }
 
     /// <inheritdoc/>
-    public async Task<Plan?> GetByIdAsync(Guid id, CancellationToken ct = default)
+    public async Task<Result<Plan, Error>> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return await _context.Plans
-            .FirstOrDefaultAsync(p => p.Id == id, ct)
-            .ConfigureAwait(false);
+        var plan = await _context.Plans
+            .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+
+        if (plan is null)
+            return GeneralErrors.NotFound(id, "План");
+
+        return plan;
     }
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<Plan>> GetAllActiveAsync(CancellationToken ct = default)
+    public async Task<Result<IReadOnlyList<Plan>, Error>> GetAllActiveAsync(CancellationToken cancellationToken = default)
     {
-        return await _context.Plans
+        var allActivePlans = await _context.Plans
             .AsNoTracking()
             .Where(p => p.IsActive)
-            .ToListAsync(ct)
-            .ConfigureAwait(false);
+            .OrderBy(p => p.Price.Value)
+            .ToListAsync(cancellationToken);
+
+        return allActivePlans;
     }
-    
+
     /// <inheritdoc/>
     public void Add(Plan plan)
     {
-        ArgumentNullException.ThrowIfNull(plan);
         _context.Plans.Add(plan);
     }
 }

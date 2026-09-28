@@ -1,13 +1,13 @@
-using MediatR;
+using Core.Abstractions;
+using Framework.ResponseExtensions;
 using Microsoft.AspNetCore.Mvc;
+using SharedKernel;
 using SubscriptionService.Application.DTOs;
 using SubscriptionService.Application.UseCases.Subscriptions.Commands.ActivateSubscription;
 using SubscriptionService.Application.UseCases.Subscriptions.Commands.CancelSubscription;
 using SubscriptionService.Application.UseCases.Subscriptions.Commands.ChangePlan;
 using SubscriptionService.Application.UseCases.Subscriptions.Commands.CreateSubscription;
 using SubscriptionService.Application.UseCases.Subscriptions.Queries.GetSubscription;
-using SubscriptionService.Web.Contracts;
-using SubscriptionService.Web.Extensions;
 
 namespace SubscriptionService.Web.Controllers;
 
@@ -15,101 +15,91 @@ namespace SubscriptionService.Web.Controllers;
 [Route("api/subscriptions")]
 public sealed class SubscriptionsController : ControllerBase
 {
-    private readonly ISender _sender;
+    private readonly ICommandHandler<CreateSubscriptionCommand, CreateSubscriptionResponse> _createSubscriptionHandler;
+    private readonly IQueryHandlerWithResult<GetSubscriptionQuery, SubscriptionResponse> _getSubscriptionHandler;
+    private readonly ICommandHandler<CancelSubscriptionCommand, CancelSubscriptionResponse> _cancelSubscriptionHandler;
+    private readonly ICommandHandler<ChangePlanCommand, ChangePlanResponse> _changePlanHandler;
+    private readonly ICommandHandler<ActivateSubscriptionCommand, ActivateSubscriptionResponse> _activateSubscriptionHandler;
 
-    public SubscriptionsController(ISender sender)
+    public SubscriptionsController(
+        ICommandHandler<CreateSubscriptionCommand, CreateSubscriptionResponse> createSubscriptionHandler,
+        IQueryHandlerWithResult<GetSubscriptionQuery, SubscriptionResponse> getSubscriptionHandler,
+        ICommandHandler<CancelSubscriptionCommand, CancelSubscriptionResponse> cancelSubscriptionHandler,
+        ICommandHandler<ChangePlanCommand, ChangePlanResponse> changePlanHandler,
+        ICommandHandler<ActivateSubscriptionCommand, ActivateSubscriptionResponse> activateSubscriptionHandler)
     {
-        _sender = sender ?? throw new ArgumentNullException(nameof(sender));
+        _createSubscriptionHandler = createSubscriptionHandler;
+        _getSubscriptionHandler = getSubscriptionHandler;
+        _cancelSubscriptionHandler = cancelSubscriptionHandler;
+        _changePlanHandler = changePlanHandler;
+        _activateSubscriptionHandler = activateSubscriptionHandler;
     }
 
-    /// <summary>Создать подписку.</summary>
     [HttpPost]
-    [ProducesResponseType(typeof(Guid), StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Create(
         [FromBody] CreateSubscriptionRequest request,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
-        var command = new CreateSubscriptionCommand(
-            request.UserId,
-            request.PlanId,
-            request.WithTrial);
+        var command = new CreateSubscriptionCommand(request);
+        var response = await _createSubscriptionHandler.HandleAsync(command, cancellationToken);
 
-        var result = await _sender.Send(command, cancellationToken)
-            .ConfigureAwait(false);
+        if (response.IsFailure)
+            return response.Error.ToResponse();
 
-        return this.FromResult(
-            result,
-            StatusCodes.Status201Created,
-            nameof(GetById),
-            new { id = result.Value });
+        return Ok(Envelope.Ok(response.Value));
     }
 
-    /// <summary>Получить подписку по ID.</summary>
     [HttpGet("{id:guid}")]
-    [ProducesResponseType(typeof(SubscriptionResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetById(
-        Guid id,
-        CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken)
     {
-        var result = await _sender.Send(new GetSubscriptionQuery(id), cancellationToken)
-            .ConfigureAwait(false);
+        var query = new GetSubscriptionQuery(new GetSubscriptionRequest(id));
+        var response = await _getSubscriptionHandler.HandleAsync(query, cancellationToken);
 
-        return this.FromResult(result);
+        if (response.IsFailure)
+            return response.Error.ToResponse();
+
+        return Ok(Envelope.Ok(response.Value));
     }
 
-    /// <summary>Отменить подписку.</summary>
     [HttpPost("{id:guid}/cancel")]
-    [ProducesResponseType(typeof(EndpointEnvelope<CancelSubscriptionResponse>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> Cancel(
-        Guid id,
-        CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Cancel(Guid id, CancellationToken cancellationToken)
     {
-        var command = new CancelSubscriptionCommand(id);
+        var response = await _cancelSubscriptionHandler.HandleAsync(
+            new CancelSubscriptionCommand(new CancelSubscriptionRequest(id)), cancellationToken);
 
-        var result = await _sender.Send(command, cancellationToken)
-            .ConfigureAwait(false);
+        if (response.IsFailure)
+            return response.Error.ToResponse();
 
-        return this.FromResult(result);
+        return Ok(Envelope.Ok(response.Value));
     }
 
-    /// <summary>Сменить тарифный план.</summary>
     [HttpPost("{id:guid}/change-plan")]
-    [ProducesResponseType(typeof(EndpointEnvelope<ChangePlanResponse>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> ChangePlan(
         Guid id,
         [FromBody] ChangePlanRequest request,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
-        var command = new ChangePlanCommand(id, request.NewPlanId);
+        var response = await _changePlanHandler.HandleAsync(
+            new ChangePlanCommand(id, request), cancellationToken);
 
-        var result = await _sender.Send(command, cancellationToken)
-            .ConfigureAwait(false);
+        if (response.IsFailure)
+            return response.Error.ToResponse();
 
-        return this.FromResult(result);
+        return Ok(Envelope.Ok(response.Value));
     }
 
-    /// <summary>Активировать подписку после оплаты счёта.</summary>
     [HttpPost("{id:guid}/activate")]
-    [ProducesResponseType(typeof(EndpointEnvelope<ActivateSubscriptionResponse>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Activate(
         Guid id,
         [FromBody] ActivateSubscriptionRequest request,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
-        var command = new ActivateSubscriptionCommand(id, request.InvoiceId);
+        var response = await _activateSubscriptionHandler.HandleAsync(
+            new ActivateSubscriptionCommand(id, request), cancellationToken);
 
-        var result = await _sender.Send(command, cancellationToken)
-            .ConfigureAwait(false);
+        if (response.IsFailure)
+            return response.Error.ToResponse();
 
-        return this.FromResult(result);
+        return Ok(Envelope.Ok(response.Value));
     }
 }

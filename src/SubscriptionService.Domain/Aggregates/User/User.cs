@@ -1,6 +1,5 @@
-using SharedKernel.Base;
-using SharedKernel.Constants;
-using SharedKernel.Result;
+using CSharpFunctionalExtensions;
+using SharedKernel;
 using SubscriptionService.Domain.ValueObjects;
 
 namespace SubscriptionService.Domain.Aggregates.User;
@@ -9,64 +8,70 @@ namespace SubscriptionService.Domain.Aggregates.User;
 /// Агрегат пользователя.
 /// Хранит минимальные данные необходимые для управления подпиской.
 /// </summary>
-public class User : AggregateRoot
+public class User
 {
-    /// <summary>Email пользователя.</summary>
+    public Guid Id { get; private set; }
+
+    /// <summary>
+    /// Версия агрегата для оптимистичной блокировки.
+    /// </summary>
+    public int Version { get; private set; }
+
+    /// <summary>
+    /// Email пользователя.
+    /// </summary>
     public UserEmail Email { get; private set; } = null!;
 
-    /// <summary>Использовал ли пользователь триальный период.</summary>
+    /// <summary>
+    /// Использовал ли пользователь триальный период.
+    /// </summary>
     public bool HasUsedTrial { get; private set; }
 
-    /// <summary>Дата регистрации.</summary>
+    /// <summary>
+    /// Дата регистрации.
+    /// </summary>
     public DateTimeOffset CreatedWhen { get; private set; }
 
-    /// <summary>Для EF Core.</summary>
-    private User() : base(Guid.Empty) { }
+    /// <summary>
+    /// Для EF Core.
+    /// </summary>
+    private User() { }
 
     private User(
         Guid id,
         UserEmail email,
-        DateTimeOffset createdWhen) : base(id)
+        DateTimeOffset createdWhen)
     {
+        Id = id;
         Email = email;
         HasUsedTrial = false;
         CreatedWhen = createdWhen;
     }
 
-    /// <summary>Зарегистрировать нового пользователя.</summary>
-    public static Result<User, Error> Create(
+    /// <summary>
+    /// Зарегистрировать нового пользователя.
+    /// </summary>
+    public static User Create(
         Guid userId,
-        string email,
+        UserEmail email,
         DateTimeOffset createdWhen)
     {
-        if (userId == Guid.Empty)
-            return Result<User, Error>.Failure(Error.Validation(
-                DomainErrors.User.InvalidId,
-                "ID пользователя не может быть пустым.",
-                nameof(userId)));
-
-        var emailResult = UserEmail.Create(email);
-        if (emailResult.IsFailure)
-            return Result<User, Error>.Failure(emailResult.Error!);
-
-        return Result<User, Error>.Success(new User(
+        return new User(
             userId,
-            emailResult.Value!,
-            createdWhen));
+            email,
+            createdWhen);
     }
 
     /// <summary>
     /// Отметить что пользователь использовал триал.
     /// Триальный период можно использовать только один раз.
     /// </summary>
-    public Result<Error> MarkTrialUsed()
+    public UnitResult<Error> MarkTrialUsed()
     {
         if (HasUsedTrial)
-            return Result<Error>.Failure(Error.Conflict(
-                DomainErrors.User.TrialAlreadyUsed,
-                "Триальный период уже был использован."));
+            return GeneralErrors.InvalidOperation("Триальный период уже был использован.");
 
         HasUsedTrial = true;
-        return Result<Error>.Success();
+        return UnitResult.Success<Error>();
     }
 }

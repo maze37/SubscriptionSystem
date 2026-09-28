@@ -1,7 +1,6 @@
-using SharedKernel.Base;
-using SharedKernel.Constants;
-using SharedKernel.Result;
 using System.Text.RegularExpressions;
+using CSharpFunctionalExtensions;
+using SharedKernel;
 
 namespace SubscriptionService.Domain.ValueObjects;
 
@@ -16,29 +15,31 @@ public class UserEmail : ValueObject
         @"^[^@\s]+@[^@\s]+\.[^@\s]+$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    /// <summary>Максимальная длина email.</summary>
-    public const int MaxLenght = 255;
-    
+    /// <summary>
+    /// Максимальная длина email.
+    /// </summary>
+    public const int MAX_LENGTH = 255;
+
     public string Value { get; }
 
     private UserEmail(string value) => Value = value;
 
-    /// <summary>Создать email с валидацией формата.</summary>
+    /// <summary>
+    /// Создать email с валидацией формата.
+    /// </summary>
     public static Result<UserEmail, Error> Create(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
-            return Result<UserEmail, Error>.Failure(Error.Validation(
-                DomainErrors.UserEmail.Empty,
-                "Email не может быть пустым.",
-                nameof(value)));
+            return GeneralErrors.ValueIsInvalid(nameof(value), "Email не может быть пустым.");
+
+        value = value.Trim();
+        if (value.Length > MAX_LENGTH)
+            return GeneralErrors.LengthIsInvalid(nameof(value), max: MAX_LENGTH);
 
         if (!EmailRegex.IsMatch(value))
-            return Result<UserEmail, Error>.Failure(Error.Validation(
-                DomainErrors.UserEmail.Invalid,
-                "Некорректный формат email.",
-                nameof(value)));
+            return GeneralErrors.ValueIsInvalid(nameof(value), "Некорректный формат email.");
 
-        return Result<UserEmail, Error>.Success(new UserEmail(value.Trim().ToLowerInvariant()));
+        return new UserEmail(value.Trim().ToLowerInvariant());
     }
 
     protected override IEnumerable<object> GetEqualityComponents()

@@ -1,8 +1,11 @@
-using SubscriptionService.Application.Abstractions.Core;
+using Core.Abstractions;
+using CSharpFunctionalExtensions;
+using SharedKernel;
 using SubscriptionService.Application.DTOs;
 
 namespace SubscriptionService.Application.UseCases.Subscriptions.Queries.GetSubscription;
 
-/// <summary>Запрос на получение подписки по ID.</summary>
-/// <param name="SubscriptionId">ID подписки.</param>
-public record GetSubscriptionQuery(Guid SubscriptionId) : IQuery<SubscriptionResponse>;
+/// <summary>
+/// Запрос на получение подписки по ID.
+/// </summary>
+public record GetSubscriptionQuery(GetSubscriptionRequest Request) : IQuery<Result<SubscriptionResponse, Error>>;

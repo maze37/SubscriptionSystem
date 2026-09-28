@@ -1,9 +1,9 @@
-using MediatR;
+using Core.Abstractions;
+using Framework.ResponseExtensions;
 using Microsoft.AspNetCore.Mvc;
+using SharedKernel;
 using SubscriptionService.Application.DTOs;
 using SubscriptionService.Application.UseCases.Users.Commands.RegisterUser;
-using SubscriptionService.Web.Contracts;
-using SubscriptionService.Web.Extensions;
 
 namespace SubscriptionService.Web.Controllers;
 
@@ -11,27 +11,24 @@ namespace SubscriptionService.Web.Controllers;
 [Route("api/users")]
 public sealed class UsersController : ControllerBase
 {
-    private readonly ISender _sender;
+    private readonly ICommandHandler<RegisterUserCommand, RegisterUserResponse> _registerUserHandler;
 
-    public UsersController(ISender sender)
+    public UsersController(ICommandHandler<RegisterUserCommand, RegisterUserResponse> registerUserHandler)
     {
-        _sender = sender ?? throw new ArgumentNullException(nameof(sender));
+        _registerUserHandler = registerUserHandler;
     }
 
-    /// <summary>Зарегистрировать нового пользователя.</summary>
     [HttpPost]
-    [ProducesResponseType(typeof(EndpointEnvelope<Guid>), StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Register(
         [FromBody] RegisterUserRequest request,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
-        var command = new RegisterUserCommand(request.Email);
+        var command = new RegisterUserCommand(request);
+        var response = await _registerUserHandler.HandleAsync(command, cancellationToken);
 
-        var result = await _sender.Send(command, cancellationToken)
-            .ConfigureAwait(false);
+        if (response.IsFailure)
+            return response.Error.ToResponse();
 
-        return this.FromResult(result, StatusCodes.Status201Created);
+        return Ok(Envelope.Ok(response.Value));
     }
 }
