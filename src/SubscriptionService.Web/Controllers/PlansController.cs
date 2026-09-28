@@ -1,10 +1,10 @@
-using MediatR;
+using Core.Abstractions;
+using Framework.ResponseExtensions;
 using Microsoft.AspNetCore.Mvc;
+using SharedKernel;
 using SubscriptionService.Application.DTOs;
 using SubscriptionService.Application.UseCases.Plans.Commands.CreatePlan;
 using SubscriptionService.Application.UseCases.Plans.Queries.GetActivePlans;
-using SubscriptionService.Web.Contracts;
-using SubscriptionService.Web.Extensions;
 
 namespace SubscriptionService.Web.Controllers;
 
@@ -12,40 +12,40 @@ namespace SubscriptionService.Web.Controllers;
 [Route("api/plans")]
 public sealed class PlansController : ControllerBase
 {
-    private readonly ISender _sender;
+    private readonly ICommandHandler<CreatePlanCommand, CreatePlanResponse> _createPlanHandler;
+    private readonly IQueryHandlerWithResult<GetActivePlansQuery, GetActivePlansResponse> _getActivePlansHandler;
 
-    public PlansController(ISender sender)
+    public PlansController(
+        ICommandHandler<CreatePlanCommand, CreatePlanResponse> createPlanHandler,
+        IQueryHandlerWithResult<GetActivePlansQuery, GetActivePlansResponse> getActivePlansHandler)
     {
-        _sender = sender ?? throw new ArgumentNullException(nameof(sender));
+        _createPlanHandler = createPlanHandler;
+        _getActivePlansHandler = getActivePlansHandler;
     }
 
-    /// <summary>Создать тарифный план.</summary>
     [HttpPost]
-    [ProducesResponseType(typeof(EndpointEnvelope<Guid>), StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create(
         [FromBody] CreatePlanRequest request,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
-        var command = new CreatePlanCommand(
-            request.Name,
-            request.Price,
-            request.BillingPeriod);
+        var command = new CreatePlanCommand(request);
+        var response = await _createPlanHandler.HandleAsync(command, cancellationToken);
 
-        var result = await _sender.Send(command, cancellationToken)
-            .ConfigureAwait(false);
+        if (response.IsFailure)
+            return response.Error.ToResponse();
 
-        return this.FromResult(result, StatusCodes.Status201Created);
+        return Ok(Envelope.Ok(response.Value));
     }
 
-    /// <summary>Получить все активные планы.</summary>
     [HttpGet("active")]
-    [ProducesResponseType(typeof(EndpointEnvelope<IReadOnlyList<PlanResponse>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetActive(CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetActive(CancellationToken cancellationToken)
     {
-        var result = await _sender.Send(new GetActivePlansQuery(), cancellationToken)
-            .ConfigureAwait(false);
+        var query = new GetActivePlansQuery(new GetActivePlansRequest());
+        var response = await _getActivePlansHandler.HandleAsync(query, cancellationToken);
 
-        return this.FromResult(result);
+        if (response.IsFailure)
+            return response.Error.ToResponse();
+
+        return Ok(Envelope.Ok(response.Value));
     }
 }

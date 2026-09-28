@@ -1,6 +1,9 @@
+using Core.Database;
+using CSharpFunctionalExtensions;
+using SharedKernel;
+using Core.Abstractions;
 using SubscriptionService.Application.Abstractions;
-using SubscriptionService.Application.Abstractions.Core;
-using SharedKernel.Result;
+using SubscriptionService.Application.DTOs;
 
 namespace SubscriptionService.Application.UseCases.Subscriptions.Commands.ActivateSubscription;
 
@@ -12,55 +15,69 @@ public class ActivateSubscriptionCommandHandler : ICommandHandler<ActivateSubscr
 {
     private readonly ISubscriptionRepository _subscriptionRepository;
     private readonly IPlanRepository _planRepository;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly ITransactionManager _transactionManager;
     private readonly IDateTimeProvider _dateTime;
 
     public ActivateSubscriptionCommandHandler(
         ISubscriptionRepository subscriptionRepository,
         IPlanRepository planRepository,
-        IUnitOfWork unitOfWork,
+        ITransactionManager transactionManager,
         IDateTimeProvider dateTime)
     {
-        _subscriptionRepository = subscriptionRepository ?? throw new ArgumentNullException(nameof(subscriptionRepository));
-        _planRepository = planRepository ?? throw new ArgumentNullException(nameof(planRepository));
-        _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
-        _dateTime = dateTime ?? throw new ArgumentNullException(nameof(dateTime));
+        _subscriptionRepository = subscriptionRepository;
+        _planRepository = planRepository;
+        _transactionManager = transactionManager;
+        _dateTime = dateTime;
     }
 
     /// <inheritdoc/>
-    public async Task<Result<ActivateSubscriptionResponse, Error>> Handle(
+    public async Task<Result<ActivateSubscriptionResponse, Error>> HandleAsync(
         ActivateSubscriptionCommand command,
         CancellationToken cancellationToken)
     {
-        var subscription = await _subscriptionRepository
-            .GetByIdAsync(command.SubscriptionId, cancellationToken)
-            .ConfigureAwait(false);
+        if (command.SubscriptionId == Guid.Empty)
+            return GeneralErrors.ValueIsInvalid(nameof(command.SubscriptionId));
 
-        if (subscription is null)
-            return Result<ActivateSubscriptionResponse, Error>.Failure(
-                Error.NotFound("subscription.not_found", $"Подписка с ID '{command.SubscriptionId}' не найдена."));
+        if (command.Request.InvoiceId == Guid.Empty)
+            return GeneralErrors.ValueIsInvalid(nameof(command.Request.InvoiceId));
+
+        var transactionResult = await _transactionManager
+            .BeginTransactionAsync(cancellationToken);
+        if (transactionResult.IsFailure)
+            return transactionResult.Error;
+
+        using var transaction = transactionResult.Value;
+
+        var subscription = await _subscriptionRepository
+            .GetByIdAsync(command.SubscriptionId, cancellationToken);
+
+        if (subscription.IsFailure)
+            return subscription.Error;
 
         var plan = await _planRepository
-            .GetByIdAsync(subscription.PlanId, cancellationToken)
-            .ConfigureAwait(false);
+            .GetByIdAsync(subscription.Value.PlanId, cancellationToken);
 
-        if (plan is null)
-            return Result<ActivateSubscriptionResponse, Error>.Failure(
-                Error.NotFound("plan.not_found", $"План с ID '{subscription.PlanId}' не найден."));
+        if (plan.IsFailure)
+            return plan.Error;
 
-        var activateResult = subscription.Activate(command.InvoiceId, plan.BillingPeriod, _dateTime.UtcNow);
+        var activateResult = subscription.Value.Activate(
+            command.Request.InvoiceId,
+            plan.Value.BillingPeriod,
+            _dateTime.UtcNow);
         if (activateResult.IsFailure)
-            return Result<ActivateSubscriptionResponse, Error>.Failure(activateResult.Error!);
+            return activateResult.Error;
 
-        _subscriptionRepository.Update(subscription);
+        _subscriptionRepository.Update(subscription.Value);
 
-        var saveResult = await _unitOfWork
-            .SaveChangesAsync(cancellationToken)
-            .ConfigureAwait(false);
+        var saveResult = await _transactionManager
+            .SaveChangesAsync(cancellationToken);
         if (saveResult.IsFailure)
-            return Result<ActivateSubscriptionResponse, Error>.Failure(saveResult.Error!);
+            return saveResult.Error;
 
-        return Result<ActivateSubscriptionResponse, Error>.Success(
-            new ActivateSubscriptionResponse(subscription.Id, command.InvoiceId));
+        var commitResult = transaction.Commit();
+        if (commitResult.IsFailure)
+            return commitResult.Error;
+
+        return new ActivateSubscriptionResponse(subscription.Value.Id, command.Request.InvoiceId);
     }
 }

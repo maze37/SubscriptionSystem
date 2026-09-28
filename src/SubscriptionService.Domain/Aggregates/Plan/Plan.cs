@@ -1,6 +1,5 @@
-using SharedKernel.Base;
-using SharedKernel.Constants;
-using SharedKernel.Result;
+using CSharpFunctionalExtensions;
+using SharedKernel;
 using SubscriptionService.Domain.Enums;
 using SubscriptionService.Domain.ValueObjects;
 
@@ -10,33 +9,53 @@ namespace SubscriptionService.Domain.Aggregates.Plan;
 /// Агрегат тарифного плана.
 /// Справочник доступных планов подписки.
 /// </summary>
-public class Plan : AggregateRoot
+public class Plan
 {
-    /// <summary>Название плана.</summary>
+    public Guid Id { get; private set; }
+
+    /// <summary>
+    /// Версия агрегата для оптимистичной блокировки.
+    /// </summary>
+    public int Version { get; private set; }
+
+    /// <summary>
+    /// Название плана.
+    /// </summary>
     public PlanName Name { get; private set; } = null!;
 
-    /// <summary>Цена плана.</summary>
+    /// <summary>
+    /// Цена плана.
+    /// </summary>
     public Money Price { get; private set; } = null!;
 
-    /// <summary>Период оплаты — месяц или год.</summary>
+    /// <summary>
+    /// Период оплаты (месяц или год).
+    /// </summary>
     public BillingPeriod BillingPeriod { get; private set; }
 
-    /// <summary>Активен ли план — можно ли на него подписаться.</summary>
+    /// <summary>
+    /// Активен ли план (можно ли на него подписаться).
+    /// </summary>
     public bool IsActive { get; private set; }
 
-    /// <summary>Дата создания плана.</summary>
+    /// <summary>
+    /// Дата создания плана.
+    /// </summary>
     public DateTimeOffset CreatedWhen { get; private set; }
 
-    /// <summary>Для EF Core.</summary>
-    private Plan() : base(Guid.Empty) { }
+    /// <summary>
+    /// Для EF Core.
+    /// </summary>
+    private Plan() { }
 
     private Plan(
         Guid id,
         PlanName name,
         Money price,
         BillingPeriod billingPeriod,
-        DateTimeOffset createdWhen) : base(id)
+        DateTimeOffset createdWhen)
     {
+        Id = id;
         Name = name;
         Price = price;
         BillingPeriod = billingPeriod;
@@ -44,66 +63,46 @@ public class Plan : AggregateRoot
         CreatedWhen = createdWhen;
     }
 
-    /// <summary>Создать новый тарифный план.</summary>
-    public static Result<Plan, Error> Create(
+    /// <summary>
+    /// Создать новый тарифный план.
+    /// </summary>
+    public static Plan Create(
         Guid planId,
-        string name,
-        decimal price,
+        PlanName name,
+        Money price,
         BillingPeriod billingPeriod,
         DateTimeOffset createdWhen)
     {
-        if (planId == Guid.Empty)
-            return Result<Plan, Error>.Failure(Error.Validation(
-                DomainErrors.Plan.InvalidId,
-                "ID плана не может быть пустым.",
-                nameof(planId)));
-
-        if (!Enum.IsDefined(billingPeriod))
-            return Result<Plan, Error>.Failure(Error.Validation(
-                DomainErrors.Plan.InvalidBillingPeriod,
-                $"Неподдерживаемый billing period '{billingPeriod}'.",
-                nameof(billingPeriod)));
-
-        var planNameResult = PlanName.Create(name);
-        if (planNameResult.IsFailure)
-            return Result<Plan, Error>.Failure(planNameResult.Error!);
-
-        var priceResult = Money.Create(price);
-        if (priceResult.IsFailure)
-            return Result<Plan, Error>.Failure(priceResult.Error!);
-
-        return Result<Plan, Error>.Success(new Plan(
+        return new Plan(
             planId,
-            planNameResult.Value!,
-            priceResult.Value!,
+            name,
+            price,
             billingPeriod,
-            createdWhen));
+            createdWhen);
     }
 
     /// <summary>
-    /// Деактивировать план — новые подписки невозможны.
+    /// Деактивировать план (новые подписки невозможны).
     /// Существующие подписки продолжают работать.
     /// </summary>
-    public Result<Error> Deactivate()
+    public UnitResult<Error> Deactivate()
     {
         if (!IsActive)
-            return Result<Error>.Failure(Error.Conflict(
-                DomainErrors.Plan.AlreadyDeactivated,
-                "План уже деактивирован."));
+            return GeneralErrors.InvalidOperation("План уже деактивирован.");
 
         IsActive = false;
-        return Result<Error>.Success();
+        return UnitResult.Success<Error>();
     }
 
-    /// <summary>Активировать план.</summary>
-    public Result<Error> Activate()
+    /// <summary>
+    /// Активировать план.
+    /// </summary>
+    public UnitResult<Error> Activate()
     {
         if (IsActive)
-            return Result<Error>.Failure(Error.Conflict(
-                DomainErrors.Plan.AlreadyActive,
-                "План уже активен."));
+            return GeneralErrors.InvalidOperation("План уже активен.");
 
         IsActive = true;
-        return Result<Error>.Success();
+        return UnitResult.Success<Error>();
     }
 }

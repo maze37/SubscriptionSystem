@@ -9,20 +9,48 @@ namespace SubscriptionService.Infrastructure;
 /// EF Core контекст приложения.
 /// Описывает набор агрегатов, которые хранятся в базе данных.
 /// </summary>
-public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+public class AppDbContext : DbContext
 {
-    /// <summary>Пользователи.</summary>
+    private const string DesignTimeConnectionString =
+        "Host=localhost;Port=25434;Database=subscription_system_db;Username=postgres;Password=1234";
+
+    /// <summary>
+    /// Создаёт контекст для инструментов EF Core.
+    /// </summary>
+    public AppDbContext() { }
+
+    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+
+    /// <summary>
+    /// Пользователи.
+    /// </summary>
     public DbSet<User> Users => Set<User>();
-    /// <summary>Тарифные планы.</summary>
+
+    /// <summary>
+    /// Тарифные планы.
+    /// </summary>
     public DbSet<Plan> Plans => Set<Plan>();
-    /// <summary>Подписки.</summary>
+
+    /// <summary>
+    /// Подписки.
+    /// </summary>
     public DbSet<Subscription> Subscriptions => Set<Subscription>();
-    
-    /// <summary>Применяет все конфигурации сущностей из сборки Infrastructure.</summary>
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        if (optionsBuilder.IsConfigured)
+            return;
+
+        var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__SubscriptionSystemDb")
+                               ?? DesignTimeConnectionString;
+
+        optionsBuilder.UseNpgsql(connectionString);
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        ArgumentNullException.ThrowIfNull(modelBuilder, nameof(modelBuilder));
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+
         base.OnModelCreating(modelBuilder);
     }
 }

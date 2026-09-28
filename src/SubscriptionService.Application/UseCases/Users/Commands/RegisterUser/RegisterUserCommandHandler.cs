@@ -1,7 +1,11 @@
+using Core.Database;
+using CSharpFunctionalExtensions;
+using SharedKernel;
+using Core.Abstractions;
 using SubscriptionService.Application.Abstractions;
-using SubscriptionService.Application.Abstractions.Core;
+using SubscriptionService.Application.DTOs;
 using SubscriptionService.Domain.Aggregates.User;
-using SharedKernel.Result;
+using SubscriptionService.Domain.ValueObjects;
 
 namespace SubscriptionService.Application.UseCases.Users.Commands.RegisterUser;
 
@@ -9,52 +13,60 @@ namespace SubscriptionService.Application.UseCases.Users.Commands.RegisterUser;
 /// Обработчик команды RegisterUserCommand.
 /// Проверяет уникальность email, создаёт пользователя и сохраняет.
 /// </summary>
-public class RegisterUserCommandHandler : ICommandHandler<RegisterUserCommand, Guid>
+public class RegisterUserCommandHandler : ICommandHandler<RegisterUserCommand, RegisterUserResponse>
 {
     private readonly IUserRepository _userRepository;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly ITransactionManager _transactionManager;
     private readonly IDateTimeProvider _dateTime;
 
     public RegisterUserCommandHandler(
         IUserRepository userRepository,
-        IUnitOfWork unitOfWork,
+        ITransactionManager transactionManager,
         IDateTimeProvider dateTime)
     {
-        _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
-        _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
-        _dateTime = dateTime ?? throw new ArgumentNullException(nameof(dateTime));
+        _userRepository = userRepository;
+        _transactionManager = transactionManager;
+        _dateTime = dateTime;
     }
 
     /// <inheritdoc/>
-    public async Task<Result<Guid, Error>> Handle(
+    public async Task<Result<RegisterUserResponse, Error>> HandleAsync(
         RegisterUserCommand command,
         CancellationToken cancellationToken)
     {
-        var normalizedEmail = command.Email.Trim().ToLowerInvariant();
+        var emailResult = UserEmail.Create(command.Request.Email);
+        if (emailResult.IsFailure)
+            return emailResult.Error;
+
+        var transactionResult = await _transactionManager
+            .BeginTransactionAsync(cancellationToken);
+        if (transactionResult.IsFailure)
+            return transactionResult.Error;
+
+        using var transaction = transactionResult.Value;
 
         var emailExists = await _userRepository
-            .ExistsByEmailAsync(normalizedEmail, cancellationToken)
-            .ConfigureAwait(false);
+            .ExistsByEmailAsync(emailResult.Value, cancellationToken);
 
         if (emailExists)
-            return Result<Guid, Error>.Failure(
-                Error.Conflict("user.email.taken", $"Пользователь с email '{command.Email}' уже существует."));
+            return GeneralErrors.AlreadyExists("Пользователь", command.Request.Email);
 
         var user = User.Create(
             Guid.NewGuid(),
-            command.Email,
+            emailResult.Value,
             _dateTime.UtcNow);
-        if (user.IsFailure)
-            return Result<Guid, Error>.Failure(user.Error!);
 
-        _userRepository.Add(user.Value!);
+        _userRepository.Add(user);
 
-        var saveResult = await _unitOfWork
-            .SaveChangesAsync(cancellationToken)
-            .ConfigureAwait(false);
+        var saveResult = await _transactionManager
+            .SaveChangesAsync(cancellationToken);
         if (saveResult.IsFailure)
-            return Result<Guid, Error>.Failure(saveResult.Error!);
+            return saveResult.Error;
 
-        return Result<Guid, Error>.Success(user.Value!.Id);
+        var commitResult = transaction.Commit();
+        if (commitResult.IsFailure)
+            return commitResult.Error;
+
+        return new RegisterUserResponse(user.Id);
     }
 }

@@ -1,5 +1,5 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Microsoft.EntityFrameworkCore;
 using SubscriptionService.Domain.Aggregates.User;
 using SubscriptionService.Domain.ValueObjects;
 
@@ -10,20 +10,22 @@ namespace SubscriptionService.Infrastructure.Configurations;
 /// </summary>
 public class UserConfiguration : IEntityTypeConfiguration<User>
 {
-    /// <summary>Настройка таблицы и колонок пользователя.</summary>
     public void Configure(EntityTypeBuilder<User> builder)
     {
-        ArgumentNullException.ThrowIfNull(builder);
-
         builder.ToTable("users");
         builder.HasKey(u => u.Id);
         builder.Property(u => u.Id).HasColumnName("id");
+
+        builder.Property(u => u.Version)
+            .HasColumnName("Version")
+            .IsConcurrencyToken()
+            .IsRequired();
 
         builder.ComplexProperty(u => u.Email, emailBuilder =>
         {
             emailBuilder.Property(e => e.Value)
                 .HasColumnName("email")
-                .HasMaxLength(UserEmail.MaxLenght)
+                .HasMaxLength(UserEmail.MAX_LENGTH)
                 .IsRequired();
         });
 

@@ -1,4 +1,6 @@
+using CSharpFunctionalExtensions;
 using Microsoft.EntityFrameworkCore;
+using SharedKernel;
 using SubscriptionService.Application.Abstractions;
 using SubscriptionService.Domain.Aggregates.Subscription;
 using SubscriptionService.Domain.Enums;
@@ -14,53 +16,59 @@ public class SubscriptionRepository : ISubscriptionRepository
 
     public SubscriptionRepository(AppDbContext context)
     {
-        _context = context ?? throw new ArgumentNullException(nameof(context));
+        _context = context;
     }
 
     /// <inheritdoc/>
-    public async Task<Subscription?> GetByIdAsync(Guid id, CancellationToken ct = default)
+    public async Task<Result<Subscription, Error>> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return await _context.Subscriptions
+        var subscription = await _context.Subscriptions
             .Include(s => s.Invoices)
-            .FirstOrDefaultAsync(s => s.Id == id, ct)
-            .ConfigureAwait(false);
+            .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
+
+        if (subscription is null)
+            return GeneralErrors.NotFound(id, "Подписка");
+
+        return subscription;
     }
 
     /// <inheritdoc/>
-    public async Task<Subscription?> GetActiveByUserIdAsync(Guid userId, CancellationToken ct = default)
+    public async Task<Result<Subscription, Error>> GetActiveByUserIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
     {
-        return await _context.Subscriptions
+        var subscription = await _context.Subscriptions
             .Include(s => s.Invoices)
             .FirstOrDefaultAsync(s =>
                 s.UserId == userId &&
                 (s.Status == SubscriptionStatus.Active ||
-                 s.Status == SubscriptionStatus.Trial), ct)
-            .ConfigureAwait(false);
+                 s.Status == SubscriptionStatus.Trial), cancellationToken);
+
+        if (subscription is null)
+            return GeneralErrors.NotFound(userId, "Активная подписка");
+
+        return subscription;
     }
 
     /// <inheritdoc/>
-    public async Task<bool> HasActiveSubscriptionAsync(Guid userId, CancellationToken ct = default)
+    public async Task<bool> HasActiveSubscriptionAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await _context.Subscriptions
             .AnyAsync(s =>
                 s.UserId == userId &&
                 (s.Status == SubscriptionStatus.Active ||
-                 s.Status == SubscriptionStatus.Trial), ct)
-            .ConfigureAwait(false);
+                 s.Status == SubscriptionStatus.Trial), cancellationToken);
     }
 
     /// <inheritdoc/>
     public void Add(Subscription subscription)
     {
-        ArgumentNullException.ThrowIfNull(subscription);
         _context.Subscriptions.Add(subscription);
     }
 
     /// <inheritdoc/>
     public void Update(Subscription subscription)
     {
-        ArgumentNullException.ThrowIfNull(subscription);
-
         var entry = _context.Entry(subscription);
         if (entry.State == EntityState.Detached)
             _context.Subscriptions.Attach(subscription);

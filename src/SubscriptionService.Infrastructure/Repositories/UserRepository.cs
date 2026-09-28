@@ -1,7 +1,9 @@
+using CSharpFunctionalExtensions;
 using Microsoft.EntityFrameworkCore;
+using SharedKernel;
 using SubscriptionService.Application.Abstractions;
-using SubscriptionService.Domain.Aggregates;
 using SubscriptionService.Domain.Aggregates.User;
+using SubscriptionService.Domain.ValueObjects;
 
 namespace SubscriptionService.Infrastructure.Repositories;
 
@@ -14,31 +16,31 @@ public class UserRepository : IUserRepository
 
     public UserRepository(AppDbContext context)
     {
-        _context = context ?? throw new ArgumentNullException(nameof(context));
+        _context = context;
     }
 
     /// <inheritdoc/>
-    public async Task<User?> GetByIdAsync(Guid id, CancellationToken ct = default)
+    public async Task<Result<User, Error>> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return await _context.Users
-            .FirstOrDefaultAsync(u => u.Id == id, ct)
-            .ConfigureAwait(false);
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
+
+        if (user is null)
+            return GeneralErrors.NotFound(id, "Пользователь");
+
+        return user;
     }
 
     /// <inheritdoc/>
-    public async Task<bool> ExistsByEmailAsync(string email, CancellationToken ct = default)
+    public async Task<bool> ExistsByEmailAsync(UserEmail email, CancellationToken cancellationToken = default)
     {
-        var normalizedEmail = email.Trim().ToLowerInvariant();
-
         return await _context.Users
-            .AnyAsync(u => u.Email.Value == normalizedEmail, ct)
-            .ConfigureAwait(false);
+            .AnyAsync(u => u.Email.Value == email.Value, cancellationToken);
     }
 
     /// <inheritdoc/>
     public void Add(User user)
     {
-        ArgumentNullException.ThrowIfNull(user);
         _context.Users.Add(user);
     }
 }

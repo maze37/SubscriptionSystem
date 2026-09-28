@@ -1,8 +1,11 @@
-// CreatePlanCommandHandler.cs
+using Core.Database;
+using CSharpFunctionalExtensions;
+using SharedKernel;
+using Core.Abstractions;
 using SubscriptionService.Application.Abstractions;
-using SubscriptionService.Application.Abstractions.Core;
+using SubscriptionService.Application.DTOs;
 using SubscriptionService.Domain.Aggregates.Plan;
-using SharedKernel.Result;
+using SubscriptionService.Domain.ValueObjects;
 
 namespace SubscriptionService.Application.UseCases.Plans.Commands.CreatePlan;
 
@@ -10,44 +13,63 @@ namespace SubscriptionService.Application.UseCases.Plans.Commands.CreatePlan;
 /// Обработчик команды CreatePlanCommand.
 /// Создаёт тарифный план и сохраняет в БД.
 /// </summary>
-public class CreatePlanCommandHandler : ICommandHandler<CreatePlanCommand, Guid>
+public class CreatePlanCommandHandler : ICommandHandler<CreatePlanCommand, CreatePlanResponse>
 {
     private readonly IPlanRepository _planRepository;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly ITransactionManager _transactionManager;
     private readonly IDateTimeProvider _dateTime;
 
     public CreatePlanCommandHandler(
         IPlanRepository planRepository,
-        IUnitOfWork unitOfWork,
+        ITransactionManager transactionManager,
         IDateTimeProvider dateTime)
     {
-        _planRepository = planRepository ?? throw new ArgumentNullException(nameof(planRepository));
-        _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
-        _dateTime = dateTime ?? throw new ArgumentNullException(nameof(dateTime));
+        _planRepository = planRepository;
+        _transactionManager = transactionManager;
+        _dateTime = dateTime;
     }
 
     /// <inheritdoc/>
-    public async Task<Result<Guid, Error>> Handle(
+    public async Task<Result<CreatePlanResponse, Error>> HandleAsync(
         CreatePlanCommand command,
         CancellationToken cancellationToken)
     {
+        if (!Enum.IsDefined(command.Request.BillingPeriod))
+            return GeneralErrors.ValueIsInvalid(nameof(command.Request.BillingPeriod));
+
+        var nameResult = PlanName.Create(command.Request.Name);
+        if (nameResult.IsFailure)
+            return nameResult.Error;
+
+        var priceResult = Money.Create(command.Request.Price);
+        if (priceResult.IsFailure)
+            return priceResult.Error;
+
         var plan = Plan.Create(
             Guid.NewGuid(),
-            command.Name,
-            command.Price,
-            command.BillingPeriod,
+            nameResult.Value,
+            priceResult.Value,
+            command.Request.BillingPeriod,
             _dateTime.UtcNow);
-        if (plan.IsFailure)
-            return Result<Guid, Error>.Failure(plan.Error!);
 
-        _planRepository.Add(plan.Value!);
+        var transactionResult = await _transactionManager
+            .BeginTransactionAsync(cancellationToken);
+        if (transactionResult.IsFailure)
+            return transactionResult.Error;
 
-        var saveResult = await _unitOfWork
-            .SaveChangesAsync(cancellationToken)
-            .ConfigureAwait(false);
+        using var transaction = transactionResult.Value;
+
+        _planRepository.Add(plan);
+
+        var saveResult = await _transactionManager
+            .SaveChangesAsync(cancellationToken);
         if (saveResult.IsFailure)
-            return Result<Guid, Error>.Failure(saveResult.Error!);
+            return saveResult.Error;
 
-        return Result<Guid, Error>.Success(plan.Value!.Id);
+        var commitResult = transaction.Commit();
+        if (commitResult.IsFailure)
+            return commitResult.Error;
+
+        return new CreatePlanResponse(plan.Id);
     }
 }

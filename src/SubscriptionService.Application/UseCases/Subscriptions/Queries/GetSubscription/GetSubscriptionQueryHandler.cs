@@ -1,7 +1,8 @@
+using CSharpFunctionalExtensions;
+using SharedKernel;
+using Core.Abstractions;
 using SubscriptionService.Application.Abstractions;
-using SubscriptionService.Application.Abstractions.Core;
 using SubscriptionService.Application.DTOs;
-using SharedKernel.Result;
 
 namespace SubscriptionService.Application.UseCases.Subscriptions.Queries.GetSubscription;
 
@@ -9,29 +10,49 @@ namespace SubscriptionService.Application.UseCases.Subscriptions.Queries.GetSubs
 /// Обработчик запроса GetSubscriptionQuery.
 /// Возвращает подписку с историей счетов.
 /// </summary>
-public class GetSubscriptionQueryHandler : IQueryHandler<GetSubscriptionQuery, SubscriptionResponse>
+public class GetSubscriptionQueryHandler : IQueryHandlerWithResult<GetSubscriptionQuery, SubscriptionResponse>
 {
     private readonly ISubscriptionRepository _subscriptionRepository;
 
     public GetSubscriptionQueryHandler(ISubscriptionRepository subscriptionRepository)
     {
-        _subscriptionRepository = subscriptionRepository
-                                  ?? throw new ArgumentNullException(nameof(subscriptionRepository));
+        _subscriptionRepository = subscriptionRepository;
     }
 
     /// <inheritdoc/>
-    public async Task<Result<SubscriptionResponse, Error>> Handle(
+    public async Task<Result<SubscriptionResponse, Error>> HandleAsync(
         GetSubscriptionQuery query,
         CancellationToken cancellationToken)
     {
-        var subscription = await _subscriptionRepository
-            .GetByIdAsync(query.SubscriptionId, cancellationToken)
-            .ConfigureAwait(false);
+        if (query.Request.SubscriptionId == Guid.Empty)
+            return GeneralErrors.ValueIsInvalid(nameof(query.Request.SubscriptionId));
 
-        if (subscription is null)
-            return Result<SubscriptionResponse, Error>.Failure(
-                Error.NotFound($"Подписка с ID '{query.SubscriptionId}' не найдена."));
+        var subscriptionResult = await _subscriptionRepository
+            .GetByIdAsync(query.Request.SubscriptionId, cancellationToken);
 
-        return Result<SubscriptionResponse, Error>.Success(subscription.ToResponse());
+        if (subscriptionResult.IsFailure)
+            return subscriptionResult.Error;
+
+        var subscription = subscriptionResult.Value;
+        var invoices = subscription.Invoices
+            .Select(invoice => new InvoiceResponse(
+                invoice.Id,
+                invoice.Amount.Value,
+                invoice.Status,
+                invoice.DueDate,
+                invoice.CreatedWhen,
+                invoice.PaidWhen))
+            .ToList();
+
+        return new SubscriptionResponse(
+            subscription.Id,
+            subscription.UserId,
+            subscription.PlanId,
+            subscription.Status,
+            subscription.CurrentPeriodEnd,
+            subscription.CancelAtPeriodEnd,
+            subscription.TrialEnd,
+            subscription.CreatedWhen,
+            invoices);
     }
 }

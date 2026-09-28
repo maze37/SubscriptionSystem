@@ -1,7 +1,11 @@
+using Core.Database;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using SubscriptionService.Application.Abstractions;
+using SubscriptionService.Infrastructure.Database;
 using SubscriptionService.Infrastructure.Repositories;
 
 namespace SubscriptionService.Infrastructure;
@@ -12,31 +16,31 @@ namespace SubscriptionService.Infrastructure;
 /// </summary>
 public static class Inject
 {
-    /// <summary>Добавить инфраструктурные зависимости приложения.</summary>
+    /// <summary>
+    /// Добавить инфраструктурные зависимости приложения.
+    /// </summary>
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        ArgumentNullException.ThrowIfNull(configuration);
+        var connectionString = configuration.GetConnectionString("SubscriptionSystemDb")
+                               ?? throw new InvalidOperationException(
+                                   "Строка подключения SubscriptionSystemDb не найдена.");
 
-        var connectionString = configuration.GetConnectionString("PostgreSQL")
-                               ?? throw new InvalidOperationException("Connection String не найдено.");
-
-        services.AddDbContext<AppDbContext>(options =>
+        services.AddDbContext<AppDbContext>((sp, options) =>
         {
-            options.UseNpgsql(connectionString, npgsql =>
-            {
-                npgsql.EnableRetryOnFailure(5, TimeSpan.FromSeconds(30), null);
-                npgsql.CommandTimeout(30);
-                npgsql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName);
-            });
+            var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+
+            options.UseNpgsql(connectionString);
+            options.UseLoggerFactory(loggerFactory);
+            options.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
         });
 
-        services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<ITransactionManager, TransactionManager>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IPlanRepository, PlanRepository>();
         services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
-        
+
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
 
         return services;

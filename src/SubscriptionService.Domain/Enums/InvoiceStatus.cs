@@ -1,6 +1,10 @@
+using CSharpFunctionalExtensions;
+using SharedKernel;
 namespace SubscriptionService.Domain.Enums;
 
-/// <summary>Статус счёта на оплату.</summary>
+/// <summary>
+/// Статус счёта на оплату.
+/// </summary>
 public enum InvoiceStatus
 {
     Pending = 1,

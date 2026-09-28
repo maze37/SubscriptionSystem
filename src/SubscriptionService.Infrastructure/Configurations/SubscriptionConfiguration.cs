@@ -1,5 +1,5 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Microsoft.EntityFrameworkCore;
 using SubscriptionService.Domain.Aggregates.Subscription;
 
 namespace SubscriptionService.Infrastructure.Configurations;
@@ -9,16 +9,18 @@ namespace SubscriptionService.Infrastructure.Configurations;
 /// </summary>
 public class SubscriptionConfiguration : IEntityTypeConfiguration<Subscription>
 {
-    /// <summary>Настройка таблиц, полей, owned-коллекции и индексов подписки.</summary>
     public void Configure(EntityTypeBuilder<Subscription> builder)
     {
-        ArgumentNullException.ThrowIfNull(builder);
-
         builder.ToTable("subscriptions");
 
         builder.HasKey(s => s.Id);
         builder.Property(s => s.Id)
             .HasColumnName("id");
+
+        builder.Property(s => s.Version)
+            .HasColumnName("Version")
+            .IsConcurrencyToken()
+            .IsRequired();
 
         builder.Property(s => s.UserId)
             .HasColumnName("user_id")

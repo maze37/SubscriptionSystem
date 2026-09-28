@@ -1,4 +1,5 @@
-using SubscriptionService.Application.Abstractions.Core;
+using Core.Abstractions;
+using SubscriptionService.Application.DTOs;
 
 namespace SubscriptionService.Application.UseCases.Subscriptions.Commands.ChangePlan;
 
@@ -6,13 +7,4 @@ namespace SubscriptionService.Application.UseCases.Subscriptions.Commands.Change
 /// Команда смены тарифного плана.
 /// Создаётся новый счёт на оплату по цене нового плана.
 /// </summary>
-/// <param name="SubscriptionId">ID подписки.</param>
-/// <param name="NewPlanId">ID нового плана.</param>
-public record ChangePlanCommand(
-    Guid SubscriptionId,
-    Guid NewPlanId) : ICommand<ChangePlanResponse>;
-
-/// <summary>Результат успешной смены плана.</summary>
-/// <param name="SubscriptionId">ID подписки.</param>
-/// <param name="NewPlanId">ID нового выбранного плана.</param>
-public record ChangePlanResponse(Guid SubscriptionId, Guid NewPlanId);
+public record ChangePlanCommand(Guid SubscriptionId, ChangePlanRequest Request) : ICommand;
