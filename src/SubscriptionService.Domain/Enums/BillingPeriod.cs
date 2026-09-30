@@ -1,5 +1,3 @@
-using CSharpFunctionalExtensions;
-using SharedKernel;
 namespace SubscriptionService.Domain.Enums;
 
 /// <summary>

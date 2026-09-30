@@ -14,12 +14,7 @@ public interface ISubscriptionRepository
     /// Получить подписку по ID вместе со счетами или ошибку, если подписка не найдена.
     /// </summary>
     Task<Result<Subscription, Error>> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Получить активную подписку пользователя или ошибку, если подписка не найдена.
-    /// </summary>
-    Task<Result<Subscription, Error>> GetActiveByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
-
+    
     /// <summary>
     /// Проверить есть ли у пользователя активная подписка.
     /// </summary>

@@ -9,9 +9,14 @@ namespace SubscriptionService.Domain.Aggregates.Subscription;
 /// Счёт на оплату подписки.
 /// Entity внутри агрегата Subscription - не существует без подписки.
 /// </summary>
-public class Invoice
+public class Invoice : IVersionedEntity
 {
     public Guid Id { get; private set; }
+    
+    /// <summary>
+    /// Версия агрегата для оптимистичной блокировки.
+    /// </summary>
+    public int Version { get; private set; }
 
     /// <summary>
     /// Сумма к оплате.
@@ -22,6 +27,21 @@ public class Invoice
     /// Статус счёта.
     /// </summary>
     public InvoiceStatus Status { get; private set; }
+
+    /// <summary>
+    /// Назначение счёта.
+    /// </summary>
+    public InvoicePurpose Purpose { get; private set; }
+
+    /// <summary>
+    /// План, который применяется после оплаты.
+    /// </summary>
+    public Guid PlanId { get; private set; }
+
+    /// <summary>
+    /// Период оплаты, зафиксированный при создании счёта.
+    /// </summary>
+    public BillingPeriod BillingPeriod { get; private set; }
 
     /// <summary>
     /// Срок оплаты.
@@ -46,12 +66,18 @@ public class Invoice
     private Invoice(
         Guid id,
         Money amount,
+        InvoicePurpose purpose,
+        Guid planId,
+        BillingPeriod billingPeriod,
         DateTimeOffset dueDate,
         DateTimeOffset createdWhen)
     {
         Id = id;
         Amount = amount;
         Status = InvoiceStatus.Pending;
+        Purpose = purpose;
+        PlanId = planId;
+        BillingPeriod = billingPeriod;
         DueDate = dueDate;
         CreatedWhen = createdWhen;
     }
@@ -62,12 +88,18 @@ public class Invoice
     public static Invoice Create(
         Guid invoiceId,
         Money amount,
+        InvoicePurpose purpose,
+        Guid planId,
+        BillingPeriod billingPeriod,
         DateTimeOffset dueDate,
         DateTimeOffset createdWhen)
     {
         return new Invoice(
             invoiceId,
             amount,
+            purpose,
+            planId,
+            billingPeriod,
             dueDate,
             createdWhen);
     }
@@ -87,19 +119,9 @@ public class Invoice
         PaidWhen = paidWhen;
         return UnitResult.Success<Error>();
     }
-
-    /// <summary>
-    /// Отметить счёт как неоплаченный (платёж отклонён).
-    /// </summary>
-    public UnitResult<Error> MarkAsFailed()
+    
+    public void IncreaseVersion()
     {
-        if (Status == InvoiceStatus.Paid)
-            return GeneralErrors.InvalidOperation("Нельзя отклонить уже оплаченный счёт.");
-
-        if (Status == InvoiceStatus.Failed)
-            return GeneralErrors.InvalidOperation("Счёт уже отклонён.");
-
-        Status = InvoiceStatus.Failed;
-        return UnitResult.Success<Error>();
+        Version++;
     }
 }

@@ -9,7 +9,7 @@ namespace SubscriptionService.Domain.Aggregates.Plan;
 /// Агрегат тарифного плана.
 /// Справочник доступных планов подписки.
 /// </summary>
-public class Plan
+public class Plan : IVersionedEntity
 {
     public Guid Id { get; private set; }
 
@@ -104,5 +104,10 @@ public class Plan
 
         IsActive = true;
         return UnitResult.Success<Error>();
+    }
+
+    public void IncreaseVersion()
+    {
+        Version++;
     }
 }

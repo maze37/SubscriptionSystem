@@ -33,31 +33,15 @@ public class SubscriptionRepository : ISubscriptionRepository
     }
 
     /// <inheritdoc/>
-    public async Task<Result<Subscription, Error>> GetActiveByUserIdAsync(
-        Guid userId,
-        CancellationToken cancellationToken = default)
-    {
-        var subscription = await _context.Subscriptions
-            .Include(s => s.Invoices)
-            .FirstOrDefaultAsync(s =>
-                s.UserId == userId &&
-                (s.Status == SubscriptionStatus.Active ||
-                 s.Status == SubscriptionStatus.Trial), cancellationToken);
-
-        if (subscription is null)
-            return GeneralErrors.NotFound(userId, "Активная подписка");
-
-        return subscription;
-    }
-
-    /// <inheritdoc/>
     public async Task<bool> HasActiveSubscriptionAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await _context.Subscriptions
             .AnyAsync(s =>
                 s.UserId == userId &&
-                (s.Status == SubscriptionStatus.Active ||
-                 s.Status == SubscriptionStatus.Trial), cancellationToken);
+                (s.Status == SubscriptionStatus.PendingPayment ||
+                 s.Status == SubscriptionStatus.Active ||
+                 s.Status == SubscriptionStatus.Trial ||
+                 s.Status == SubscriptionStatus.PastDue), cancellationToken);
     }
 
     /// <inheritdoc/>

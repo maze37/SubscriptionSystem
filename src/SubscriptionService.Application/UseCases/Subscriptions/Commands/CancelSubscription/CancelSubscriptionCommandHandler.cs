@@ -35,34 +35,24 @@ public class CancelSubscriptionCommandHandler : ICommandHandler<CancelSubscripti
         if (command.Request.SubscriptionId == Guid.Empty)
             return GeneralErrors.ValueIsInvalid(nameof(command.Request.SubscriptionId));
 
-        var transactionResult = await _transactionManager
-            .BeginTransactionAsync(cancellationToken);
-        if (transactionResult.IsFailure)
-            return transactionResult.Error;
-
-        using var transaction = transactionResult.Value;
-
         var subscriptionResult = await _subscriptionRepository
             .GetByIdAsync(command.Request.SubscriptionId, cancellationToken);
-
         if (subscriptionResult.IsFailure)
             return subscriptionResult.Error;
 
-        var cancelResult = subscriptionResult.Value.Cancel(_dateTime.UtcNow);
+        var subscription = subscriptionResult.Value;
+
+        var cancelResult = subscription.Cancel(_dateTime.UtcNow);
         if (cancelResult.IsFailure)
             return cancelResult.Error;
 
-        _subscriptionRepository.Update(subscriptionResult.Value);
+        _subscriptionRepository.Update(subscription);
 
         var saveResult = await _transactionManager
             .SaveChangesAsync(cancellationToken);
         if (saveResult.IsFailure)
             return saveResult.Error;
 
-        var commitResult = transaction.Commit();
-        if (commitResult.IsFailure)
-            return commitResult.Error;
-
-        return new CancelSubscriptionResponse(subscriptionResult.Value.Id);
+        return new CancelSubscriptionResponse(subscription.Id);
     }
 }

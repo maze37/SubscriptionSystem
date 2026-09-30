@@ -78,6 +78,25 @@ public class SubscriptionConfiguration : IEntityTypeConfiguration<Subscription>
                 .HasConversion<string>()
                 .IsRequired();
 
+            invoiceBuilder.Property(i => i.Purpose)
+                .HasColumnName("purpose")
+                .HasConversion<string>()
+                .IsRequired();
+
+            invoiceBuilder.Property(i => i.PlanId)
+                .HasColumnName("plan_id")
+                .IsRequired();
+
+            invoiceBuilder.Property(i => i.BillingPeriod)
+                .HasColumnName("billing_period")
+                .HasConversion<string>()
+                .IsRequired();
+
+            invoiceBuilder.Property(i => i.Version)
+                .HasColumnName("Version")
+                .IsConcurrencyToken()
+                .IsRequired();
+
             invoiceBuilder.Property(i => i.DueDate)
                 .HasColumnName("due_date")
                 .IsRequired();
@@ -94,6 +113,8 @@ public class SubscriptionConfiguration : IEntityTypeConfiguration<Subscription>
             .HasField("_invoices");
 
         builder.HasIndex(s => s.UserId)
-            .HasDatabaseName("ix_subscriptions_user_id");
+            .IsUnique()
+            .HasFilter("\"status\" IN ('PendingPayment', 'Trial', 'Active', 'PastDue')")
+            .HasDatabaseName("ux_subscriptions_active_user");
     }
 }

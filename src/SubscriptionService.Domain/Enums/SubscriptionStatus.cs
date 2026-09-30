@@ -1,5 +1,3 @@
-using CSharpFunctionalExtensions;
-using SharedKernel;
 namespace SubscriptionService.Domain.Enums;
 
 /// <summary>
@@ -7,9 +5,10 @@ namespace SubscriptionService.Domain.Enums;
 /// </summary>
 public enum SubscriptionStatus
 {
-    Trial = 1,
-    Active = 2,
-    Cancelled = 3,
-    Expired = 4,
-    PastDue = 5
+    PendingPayment = 1,
+    Trial = 2,
+    Active = 3,
+    PastDue = 4,
+    Cancelled = 5,
+    Expired = 6
 }

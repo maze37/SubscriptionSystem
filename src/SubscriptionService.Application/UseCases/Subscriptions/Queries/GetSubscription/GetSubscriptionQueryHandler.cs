@@ -39,6 +39,9 @@ public class GetSubscriptionQueryHandler : IQueryHandlerWithResult<GetSubscripti
                 invoice.Id,
                 invoice.Amount.Value,
                 invoice.Status,
+                invoice.Purpose,
+                invoice.PlanId,
+                invoice.BillingPeriod,
                 invoice.DueDate,
                 invoice.CreatedWhen,
                 invoice.PaidWhen))

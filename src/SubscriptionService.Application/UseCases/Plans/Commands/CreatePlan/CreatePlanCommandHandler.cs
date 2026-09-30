@@ -52,23 +52,12 @@ public class CreatePlanCommandHandler : ICommandHandler<CreatePlanCommand, Creat
             command.Request.BillingPeriod,
             _dateTime.UtcNow);
 
-        var transactionResult = await _transactionManager
-            .BeginTransactionAsync(cancellationToken);
-        if (transactionResult.IsFailure)
-            return transactionResult.Error;
-
-        using var transaction = transactionResult.Value;
-
         _planRepository.Add(plan);
 
         var saveResult = await _transactionManager
             .SaveChangesAsync(cancellationToken);
         if (saveResult.IsFailure)
             return saveResult.Error;
-
-        var commitResult = transaction.Commit();
-        if (commitResult.IsFailure)
-            return commitResult.Error;
 
         return new CreatePlanResponse(plan.Id);
     }

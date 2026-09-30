@@ -13,14 +13,65 @@ public class RegressionTests
         Money.Create(100).Value, BillingPeriod.Monthly, false, Now);
 
     [Fact]
-    public void PaidInvoiceCannotBePaidTwice()
+    public void RepeatedActivationIsIdempotent()
     {
         var subscription = Create();
         var invoice = Assert.Single(subscription.Invoices);
-        Assert.True(subscription.Activate(invoice.Id, BillingPeriod.Monthly, Now).IsSuccess);
-        Assert.True(subscription.Activate(invoice.Id, BillingPeriod.Monthly, Now).IsFailure);
+        Assert.Equal(SubscriptionStatus.PendingPayment, subscription.Status);
+
+        Assert.True(subscription.Activate(invoice.Id, Now).IsSuccess);
+        var periodEnd = subscription.CurrentPeriodEnd;
+
+        Assert.True(subscription.Activate(invoice.Id, Now.AddDays(1)).IsSuccess);
         Assert.Equal(InvoiceStatus.Paid, invoice.Status);
         Assert.Equal(Now, invoice.PaidWhen);
+        Assert.Equal(periodEnd, subscription.CurrentPeriodEnd);
+        Assert.Equal(SubscriptionStatus.Active, subscription.Status);
+    }
+
+    [Fact]
+    public void PlanChangeIsAppliedOnlyAfterInvoicePayment()
+    {
+        var subscription = Create();
+        var initialInvoice = Assert.Single(subscription.Invoices);
+        Assert.True(subscription.Activate(initialInvoice.Id, Now).IsSuccess);
+
+        var originalPlanId = subscription.PlanId;
+        var newPlanId = Guid.NewGuid();
+        Assert.True(subscription.ChangePlan(
+            Guid.NewGuid(),
+            newPlanId,
+            Money.Create(200).Value,
+            BillingPeriod.Yearly,
+            Now.AddDays(1)).IsSuccess);
+
+        Assert.Equal(originalPlanId, subscription.PlanId);
+
+        var changeInvoice = subscription.Invoices.Single(i => i.Purpose == InvoicePurpose.ChangePlan);
+        Assert.True(subscription.Activate(changeInvoice.Id, Now.AddDays(2)).IsSuccess);
+        Assert.Equal(newPlanId, subscription.PlanId);
+        Assert.Equal(InvoiceStatus.Paid, changeInvoice.Status);
+    }
+
+    [Fact]
+    public void RenewalIsAppliedOnlyAfterInvoicePayment()
+    {
+        var subscription = Create();
+        var initialInvoice = Assert.Single(subscription.Invoices);
+        Assert.True(subscription.Activate(initialInvoice.Id, Now).IsSuccess);
+        var originalPeriodEnd = subscription.CurrentPeriodEnd;
+
+        Assert.True(subscription.Renew(
+            Guid.NewGuid(),
+            Money.Create(100).Value,
+            BillingPeriod.Monthly,
+            Now.AddDays(1)).IsSuccess);
+
+        Assert.Equal(originalPeriodEnd, subscription.CurrentPeriodEnd);
+
+        var renewalInvoice = subscription.Invoices.Single(i => i.Purpose == InvoicePurpose.Renewal);
+        Assert.True(subscription.Activate(renewalInvoice.Id, Now.AddDays(2)).IsSuccess);
+        Assert.Equal(originalPeriodEnd.AddMonths(1), subscription.CurrentPeriodEnd);
     }
 
     [Fact]
@@ -33,6 +84,7 @@ public class RegressionTests
             Guid.NewGuid(),
             Guid.NewGuid(),
             Money.Create(100).Value,
+            BillingPeriod.Monthly,
             Now).IsFailure);
         Assert.Equal(planId, subscription.PlanId);
         Assert.Single(subscription.Invoices);

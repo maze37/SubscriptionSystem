@@ -8,7 +8,7 @@ namespace SubscriptionService.Domain.Aggregates.User;
 /// Агрегат пользователя.
 /// Хранит минимальные данные необходимые для управления подпиской.
 /// </summary>
-public class User
+public class User : IVersionedEntity
 {
     public Guid Id { get; private set; }
 
@@ -73,5 +73,10 @@ public class User
 
         HasUsedTrial = true;
         return UnitResult.Success<Error>();
+    }
+
+    public void IncreaseVersion()
+    {
+        Version++;
     }
 }

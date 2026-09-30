@@ -21,12 +21,16 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .IsConcurrencyToken()
             .IsRequired();
 
-        builder.ComplexProperty(u => u.Email, emailBuilder =>
+        builder.OwnsOne(u => u.Email, emailBuilder =>
         {
             emailBuilder.Property(e => e.Value)
                 .HasColumnName("email")
                 .HasMaxLength(UserEmail.MAX_LENGTH)
                 .IsRequired();
+
+            emailBuilder.HasIndex(e => e.Value)
+                .IsUnique()
+                .HasDatabaseName("ux_users_email");
         });
 
         builder.Property(u => u.HasUsedTrial)

@@ -38,16 +38,7 @@ public class RegisterUserCommandHandler : ICommandHandler<RegisterUserCommand, R
         if (emailResult.IsFailure)
             return emailResult.Error;
 
-        var transactionResult = await _transactionManager
-            .BeginTransactionAsync(cancellationToken);
-        if (transactionResult.IsFailure)
-            return transactionResult.Error;
-
-        using var transaction = transactionResult.Value;
-
-        var emailExists = await _userRepository
-            .ExistsByEmailAsync(emailResult.Value, cancellationToken);
-
+        var emailExists = await _userRepository.ExistsByEmailAsync(emailResult.Value, cancellationToken);
         if (emailExists)
             return GeneralErrors.AlreadyExists("Пользователь", command.Request.Email);
 
@@ -62,10 +53,6 @@ public class RegisterUserCommandHandler : ICommandHandler<RegisterUserCommand, R
             .SaveChangesAsync(cancellationToken);
         if (saveResult.IsFailure)
             return saveResult.Error;
-
-        var commitResult = transaction.Commit();
-        if (commitResult.IsFailure)
-            return commitResult.Error;
 
         return new RegisterUserResponse(user.Id);
     }

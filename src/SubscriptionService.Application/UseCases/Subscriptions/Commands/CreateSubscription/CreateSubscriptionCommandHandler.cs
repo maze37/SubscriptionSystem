@@ -46,28 +46,18 @@ public class CreateSubscriptionCommandHandler : ICommandHandler<CreateSubscripti
         if (command.Request.UserId == Guid.Empty)
             return GeneralErrors.ValueIsInvalid(nameof(command.Request.UserId), "ID пользователя не может быть пустым.");
 
-        var transactionResult = await _transactionManager
-            .BeginTransactionAsync(cancellationToken);
-        if (transactionResult.IsFailure)
-            return transactionResult.Error;
-
-        using var transaction = transactionResult.Value;
-
         var user = await _userRepository
             .GetByIdAsync(command.Request.UserId, cancellationToken);
-
         if (user.IsFailure)
             return user.Error;
 
         var hasActive = await _subscriptionRepository
             .HasActiveSubscriptionAsync(command.Request.UserId, cancellationToken);
-
         if (hasActive)
             return GeneralErrors.AlreadyExists("Активная подписка");
 
         var plan = await _planRepository
             .GetByIdAsync(command.Request.PlanId, cancellationToken);
-
         if (plan.IsFailure)
             return plan.Error;
 
@@ -97,10 +87,6 @@ public class CreateSubscriptionCommandHandler : ICommandHandler<CreateSubscripti
             .SaveChangesAsync(cancellationToken);
         if (saveResult.IsFailure)
             return saveResult.Error;
-
-        var commitResult = transaction.Commit();
-        if (commitResult.IsFailure)
-            return commitResult.Error;
 
         return new CreateSubscriptionResponse(subscription.Id);
     }

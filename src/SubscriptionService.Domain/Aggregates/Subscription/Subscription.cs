@@ -9,7 +9,7 @@ namespace SubscriptionService.Domain.Aggregates.Subscription;
 /// Агрегат подписки пользователя на тарифный план.
 /// Управляет жизненным циклом подписки и счетами на оплату.
 /// </summary>
-public class Subscription
+public class Subscription : IVersionedEntity
 {
     public Guid Id { get; private set; }
 
@@ -132,13 +132,16 @@ public class Subscription
             id,
             userId,
             planId,
-            SubscriptionStatus.Active,
-            currentPeriodEnd: CalculatePeriodEnd(createdWhen, billingPeriod),
+            SubscriptionStatus.PendingPayment,
+            currentPeriodEnd: createdWhen,
             createdWhen: createdWhen);
 
         var invoice = Invoice.Create(
             invoiceId,
             price,
+            InvoicePurpose.InitialSubscription,
+            planId,
+            billingPeriod,
             dueDate: createdWhen.AddDays(3),
             createdWhen: createdWhen);
 
@@ -182,27 +185,32 @@ public class Subscription
         Guid invoiceId,
         Guid newPlanId,
         Money newPrice,
+        BillingPeriod billingPeriod,
         DateTimeOffset changedWhen)
     {
         if (Status != SubscriptionStatus.Active &&
             Status != SubscriptionStatus.Trial)
             return GeneralErrors.InvalidOperation("Нельзя сменить план неактивной подписки.");
 
+        if (_invoices.Any(invoice => invoice.Status == InvoiceStatus.Pending))
+            return GeneralErrors.InvalidOperation("У подписки уже есть неоплаченный счёт.");
+
         var invoice = Invoice.Create(
             invoiceId,
             newPrice,
+            InvoicePurpose.ChangePlan,
+            newPlanId,
+            billingPeriod,
             dueDate: changedWhen.AddDays(3),
             createdWhen: changedWhen);
 
-        PlanId = newPlanId;
         _invoices.Add(invoice);
         return UnitResult.Success<Error>();
     }
 
     /// <summary>
-    /// Продлить подписку на следующий период.
-    /// Вызывается фоновым сервисом когда заканчивается CurrentPeriodEnd.
-    /// Если CancelAtPeriodEnd = true - подписка переходит в Cancelled.
+    /// Создать счёт на продление следующего периода.
+    /// Период изменится только после оплаты счёта.
     /// </summary>
     public UnitResult<Error> Renew(
         Guid invoiceId,
@@ -216,13 +224,18 @@ public class Subscription
         if (Status != SubscriptionStatus.Active)
             return GeneralErrors.InvalidOperation("Нельзя продлить неактивную подписку.");
 
+        if (_invoices.Any(invoice => invoice.Status == InvoiceStatus.Pending))
+            return GeneralErrors.InvalidOperation("У подписки уже есть неоплаченный счёт.");
+
         var invoice = Invoice.Create(
             invoiceId,
             price,
+            InvoicePurpose.Renewal,
+            PlanId,
+            billingPeriod,
             dueDate: renewedWhen.AddDays(3),
             createdWhen: renewedWhen);
 
-        CurrentPeriodEnd = CalculatePeriodEnd(renewedWhen, billingPeriod);
         _invoices.Add(invoice);
         return UnitResult.Success<Error>();
     }
@@ -232,7 +245,6 @@ public class Subscription
     /// </summary>
     public UnitResult<Error> Activate(
         Guid invoiceId,
-        BillingPeriod billingPeriod,
         DateTimeOffset activatedWhen)
     {
         var invoice = _invoices.FirstOrDefault(i => i.Id == invoiceId);
@@ -240,12 +252,35 @@ public class Subscription
         if (invoice is null)
             return GeneralErrors.NotFound(invoiceId, nameof(Invoice));
 
-        var invoicePaymentResult = invoice.MarkAsPaid(activatedWhen);
-        if (invoicePaymentResult.IsFailure)
-            return invoicePaymentResult;
+        if (invoice.Status == InvoiceStatus.Paid)
+            return UnitResult.Success<Error>();
 
-        Status = SubscriptionStatus.Active;
-        CurrentPeriodEnd = CalculatePeriodEnd(activatedWhen, billingPeriod);
+        var paymentResult = invoice.MarkAsPaid(activatedWhen);
+        if (paymentResult.IsFailure)
+            return paymentResult;
+
+        switch (invoice.Purpose)
+        {
+            case InvoicePurpose.InitialSubscription:
+            case InvoicePurpose.ChangePlan:
+                PlanId = invoice.PlanId;
+                Status = SubscriptionStatus.Active;
+                CurrentPeriodEnd = CalculatePeriodEnd(activatedWhen, invoice.BillingPeriod);
+                break;
+
+            case InvoicePurpose.Renewal:
+                var periodStart = CurrentPeriodEnd > activatedWhen
+                    ? CurrentPeriodEnd
+                    : activatedWhen;
+
+                Status = SubscriptionStatus.Active;
+                CurrentPeriodEnd = CalculatePeriodEnd(periodStart, invoice.BillingPeriod);
+                break;
+
+            default:
+                throw new ArgumentOutOfRangeException(nameof(invoice.Purpose));
+        }
+
         return UnitResult.Success<Error>();
     }
 
@@ -260,5 +295,10 @@ public class Subscription
         ExpiredWhen = expiredWhen;
         Status = SubscriptionStatus.Expired;
         return UnitResult.Success<Error>();
+    }
+
+    public void IncreaseVersion()
+    {
+        Version++;
     }
 }

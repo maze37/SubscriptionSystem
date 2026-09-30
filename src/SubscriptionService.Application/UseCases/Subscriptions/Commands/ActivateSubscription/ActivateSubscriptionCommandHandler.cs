@@ -14,18 +14,15 @@ namespace SubscriptionService.Application.UseCases.Subscriptions.Commands.Activa
 public class ActivateSubscriptionCommandHandler : ICommandHandler<ActivateSubscriptionCommand, ActivateSubscriptionResponse>
 {
     private readonly ISubscriptionRepository _subscriptionRepository;
-    private readonly IPlanRepository _planRepository;
     private readonly ITransactionManager _transactionManager;
     private readonly IDateTimeProvider _dateTime;
 
     public ActivateSubscriptionCommandHandler(
         ISubscriptionRepository subscriptionRepository,
-        IPlanRepository planRepository,
         ITransactionManager transactionManager,
         IDateTimeProvider dateTime)
     {
         _subscriptionRepository = subscriptionRepository;
-        _planRepository = planRepository;
         _transactionManager = transactionManager;
         _dateTime = dateTime;
     }
@@ -41,43 +38,26 @@ public class ActivateSubscriptionCommandHandler : ICommandHandler<ActivateSubscr
         if (command.Request.InvoiceId == Guid.Empty)
             return GeneralErrors.ValueIsInvalid(nameof(command.Request.InvoiceId));
 
-        var transactionResult = await _transactionManager
-            .BeginTransactionAsync(cancellationToken);
-        if (transactionResult.IsFailure)
-            return transactionResult.Error;
-
-        using var transaction = transactionResult.Value;
-
-        var subscription = await _subscriptionRepository
+        var subscriptionResult = await _subscriptionRepository
             .GetByIdAsync(command.SubscriptionId, cancellationToken);
+        if (subscriptionResult.IsFailure)
+            return subscriptionResult.Error;
 
-        if (subscription.IsFailure)
-            return subscription.Error;
+        var subscription = subscriptionResult.Value;
 
-        var plan = await _planRepository
-            .GetByIdAsync(subscription.Value.PlanId, cancellationToken);
-
-        if (plan.IsFailure)
-            return plan.Error;
-
-        var activateResult = subscription.Value.Activate(
+        var activateResult = subscription.Activate(
             command.Request.InvoiceId,
-            plan.Value.BillingPeriod,
             _dateTime.UtcNow);
         if (activateResult.IsFailure)
             return activateResult.Error;
 
-        _subscriptionRepository.Update(subscription.Value);
+        _subscriptionRepository.Update(subscription);
 
         var saveResult = await _transactionManager
             .SaveChangesAsync(cancellationToken);
         if (saveResult.IsFailure)
             return saveResult.Error;
 
-        var commitResult = transaction.Commit();
-        if (commitResult.IsFailure)
-            return commitResult.Error;
-
-        return new ActivateSubscriptionResponse(subscription.Value.Id, command.Request.InvoiceId);
+        return new ActivateSubscriptionResponse(subscription.Id, command.Request.InvoiceId);
     }
 }

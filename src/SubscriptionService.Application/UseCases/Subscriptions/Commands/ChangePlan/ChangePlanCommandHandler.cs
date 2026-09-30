@@ -41,22 +41,13 @@ public class ChangePlanCommandHandler : ICommandHandler<ChangePlanCommand, Chang
         if (command.Request.NewPlanId == Guid.Empty)
             return GeneralErrors.ValueIsInvalid(nameof(command.Request.NewPlanId));
 
-        var transactionResult = await _transactionManager
-            .BeginTransactionAsync(cancellationToken);
-        if (transactionResult.IsFailure)
-            return transactionResult.Error;
-
-        using var transaction = transactionResult.Value;
-
         var subscription = await _subscriptionRepository
             .GetByIdAsync(command.SubscriptionId, cancellationToken);
-
         if (subscription.IsFailure)
             return subscription.Error;
 
         var plan = await _planRepository
             .GetByIdAsync(command.Request.NewPlanId, cancellationToken);
-
         if (plan.IsFailure)
             return plan.Error;
 
@@ -67,6 +58,7 @@ public class ChangePlanCommandHandler : ICommandHandler<ChangePlanCommand, Chang
             Guid.NewGuid(),
             plan.Value.Id,
             plan.Value.Price,
+            plan.Value.BillingPeriod,
             _dateTime.UtcNow);
         if (changeResult.IsFailure)
             return changeResult.Error;
@@ -77,10 +69,6 @@ public class ChangePlanCommandHandler : ICommandHandler<ChangePlanCommand, Chang
             .SaveChangesAsync(cancellationToken);
         if (saveResult.IsFailure)
             return saveResult.Error;
-
-        var commitResult = transaction.Commit();
-        if (commitResult.IsFailure)
-            return commitResult.Error;
 
         return new ChangePlanResponse(subscription.Value.Id, command.Request.NewPlanId);
     }
