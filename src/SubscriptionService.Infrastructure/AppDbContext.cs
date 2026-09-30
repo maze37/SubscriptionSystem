@@ -13,10 +13,7 @@ public class AppDbContext : DbContext
 {
     private const string DesignTimeConnectionString =
         "Host=localhost;Port=25434;Database=subscription_system_db;Username=postgres;Password=1234";
-
-    /// <summary>
-    /// Создаёт контекст для инструментов EF Core.
-    /// </summary>
+    
     public AppDbContext() { }
 
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
